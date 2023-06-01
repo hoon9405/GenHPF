@@ -63,7 +63,7 @@ $ bash preprocess/preprocess_run.sh
 Note that pre-processing takes about 6hours in 128 cores of AMD EPYC 7502 32-Core Processor, and requires 180GB of RAM.
 
 
-STEP 3. Training a new model
+## STEP 3. Training a new model
 Other configurations will set to be default, which were used in the GenHPF paper.
 $data should be set to 'mimic3' or 'eicu' or ‘mimic4’ 
 `$model` should be set to one of [‘SAnD’, ‘Rajkomar’, ‘DescEmb’, ‘GenHPF’]
