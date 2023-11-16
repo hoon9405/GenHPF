@@ -1,8 +1,8 @@
-# GenHPF : General Healthcare Predictive Framework with Zero Domain Knowledge
+# GenHPF : General Healthcare Predictive Framework for Multi-task Multi-source Learning
 
-GenHPF is a general healthcare predictive framework, which requires no medical domain knowledge and minimal preprocessing for multiple prediction tasks. Given any time-series EHR, 		 	 	 			
-					
-Our framework presents a method for embedding any form of EHR systems for prediction tasks with- out requiring domain-knowledge-based pre-processing, such as medical code mapping and feature selection.  
+GenHPF is a general healthcare predictive framework, which requires no medical domain knowledge and minimal preprocessing for multiple prediction tasks. 
+
+Our framework presents a method for embedding any form of EHR systems for prediction tasks without requiring domain-knowledge-based pre-processing, such as medical code mapping and feature selection.  
 				
 This repository provides official Pytorch code to implement GenHPF, a general healthcare predictive framework.
 
@@ -135,6 +135,18 @@ $ python main.py \
 
 Note that `--ratio` indicates proportion of target dataset for few-shot learning settings. (if ratio is set to zero, then it is zero shot learning) 
 
+## Citation
+If you find GenHPF useful for your research and applications, please cite using this BibTeX:
+```bibtex
+
+@article{hur2023genhpf,
+  title={GenHPF: General Healthcare Predictive Framework for Multi-task Multi-source Learning},
+  author={Hur, Kyunghoon and Oh, Jungwoo and Kim, Junu and Kim, Jiyoun and Lee, Min Jae and Cho, Eunbyeol and Moon, Seong-Eun and Kim, Young-Hak and Atallah, Louis and Choi, Edward},
+  journal={IEEE Journal of Biomedical and Health Informatics},
+  year={2023},
+  publisher={IEEE}
+}
+```
 
 # License
 This repository is MIT-lincensed.
