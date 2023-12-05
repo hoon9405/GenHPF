@@ -7,6 +7,7 @@ seed=$5
 OMP_NUM_THREADS=16 \
 CUDA_VISIBLE_DEVICES=$device_num \
 python3 ../../main.py \
+# --input_path /home/XXX/YYY -> make sure to add input path here
 --train_task pretrain \
 --train_src $train_src \
 --pretrain_task mlm \

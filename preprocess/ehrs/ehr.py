@@ -27,8 +27,8 @@ class EHR(object):
 
         self.cache = cfg.cache
         
-        #cache_dir = os.path.expanduser("~/.cache/ehr")
-        cache_dir = self.cfg.dest
+        cache_dir = os.path.expanduser("~./cache/ehr")
+        #cache_dir = self.cfg.dest
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         self.cache_dir = cache_dir

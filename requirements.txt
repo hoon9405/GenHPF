@@ -37,12 +37,12 @@ six==1.16.0
 smmap==5.0.0
 threadpoolctl==3.1.0
 tokenizers==0.13.3
-torch==1.12.1+cu113
-torchaudio==0.12.1+cu113
-torchvision==0.13.1+cu113
 tqdm==4.65.0
 transformers==4.29.2
 typing_extensions==4.6.2
 tzdata==2023.3
 urllib3==1.26.16
 wandb==0.15.3
+pyspark==3.5.0
+pyarrow==14.0.1
+treelib==1.7.0 

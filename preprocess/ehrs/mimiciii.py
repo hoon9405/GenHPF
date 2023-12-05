@@ -388,16 +388,18 @@ class MIMICIII(EHR):
 
         # prepare icustays according to the appropriate format
         icustays = icustays[icustays["FIRST_CAREUNIT"] == icustays["LAST_CAREUNIT"]]
-        icustays.loc[:, "INTIME"] = pd.to_datetime(
-            icustays["INTIME"], infer_datetime_format=True
+        
+        icustays["INTIME"] = pd.to_datetime(
+            icustays["INTIME"], infer_datetime_format=True, utc=True
         )
-        icustays.loc[:, "OUTTIME"] = pd.to_datetime(
-            icustays["OUTTIME"], infer_datetime_format=True
+        
+        icustays["OUTTIME"] = pd.to_datetime(
+            icustays["OUTTIME"], infer_datetime_format=True, utc=True
         )
         icustays = icustays.drop(columns=["ROW_ID"])
 
         # merge icustays with patients to get DOB
-        patients["DOB"] = pd.to_datetime(patients["DOB"], infer_datetime_format=True)
+        patients["DOB"] = pd.to_datetime(patients["DOB"], infer_datetime_format=True, utc=True)
         patients = patients[
             patients["SUBJECT_ID"].isin(icustays["SUBJECT_ID"])
         ]
@@ -426,12 +428,9 @@ class MIMICIII(EHR):
         )
         icustays["DISCHARGE_LOCATION"].replace("DEAD/EXPIRED", "Death", inplace=True)
 
-        # icustays["DEATHTIME"] = pd.to_datetime(
-        #     icustays["DEATHTIME"], infer_datetime_format=True
-        # )
-        # XXX DISCHTIME --> HOSPITAL DISCHARGE TIME?
+       
         icustays["DISCHTIME"] = pd.to_datetime(
-            icustays["DISCHTIME"], infer_datetime_format=True
+            icustays["DISCHTIME"], infer_datetime_format=True, utc=True
         )
 
         icustays["IN_ICU_MORTALITY"] = (
@@ -442,7 +441,7 @@ class MIMICIII(EHR):
         icustays["DISCHARGE_LOCATION"] = icustays["DISCHARGE_LOCATION"].map(self.disch_map_dict)
 
         icustays.rename(columns={"DISCHARGE_LOCATION": "HOS_DISCHARGE_LOCATION"}, inplace=True)
-
+        #breakpoint()
         icustays["DISCHTIME"] = (icustays["DISCHTIME"] - icustays["INTIME"]).dt.total_seconds() // 60
         icustays["OUTTIME"] = (icustays["OUTTIME"] - icustays["INTIME"]).dt.total_seconds() // 60
         return icustays

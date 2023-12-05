@@ -37,7 +37,7 @@ import criterions
 
 def get_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_path', type=str, default='/nfs_edlab/ghhur/GenHPF/input12hr/')
+    parser.add_argument('--input_path', type=str, default='/')
     parser.add_argument('--save_dir', type=str, default='checkpoints')
     parser.add_argument('--save_prefix', type=str, default='checkpoint')
 
