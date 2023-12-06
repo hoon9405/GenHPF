@@ -441,7 +441,6 @@ class MIMICIII(EHR):
         icustays["DISCHARGE_LOCATION"] = icustays["DISCHARGE_LOCATION"].map(self.disch_map_dict)
 
         icustays.rename(columns={"DISCHARGE_LOCATION": "HOS_DISCHARGE_LOCATION"}, inplace=True)
-        #breakpoint()
         icustays["DISCHTIME"] = (icustays["DISCHTIME"] - icustays["INTIME"]).dt.total_seconds() // 60
         icustays["OUTTIME"] = (icustays["OUTTIME"] - icustays["INTIME"]).dt.total_seconds() // 60
         return icustays

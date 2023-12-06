@@ -67,7 +67,8 @@ class MIMICIV(EHR):
                     "labevent_id",
                     "storetime",
                     "subject_id",
-                    "specimen_id"
+                    "specimen_id",
+                    "order_provider_id", #MIMIC-IV-2.2V added this column
                 ],
                 "code": ["itemid"],
                 "desc": ["hosp/d_labitems" + self.ext],
@@ -86,6 +87,7 @@ class MIMICIV(EHR):
                     "poe_seq",
                     "formulary_drug_cd",
                     "stoptime",
+                    "order_provider_id", #MIMIC-IV-2.2V added this column
                 ],
             },
             {
