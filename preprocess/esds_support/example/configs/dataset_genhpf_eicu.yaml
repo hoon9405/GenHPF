@@ -1,0 +1,201 @@
+defaults:
+  - dataset_base
+  - _self_
+
+connection_uri: "postgres://${oc.env:USER}:@localhost:5432/eicu"
+save_dir: "${oc.env:PROJECT_DATA_DIR}/${cohort_name}"
+subject_id_col: "icustay_id"
+min_los: 1
+min_admissions: 1
+min_age: 18
+observation_hrs: 12
+max_icd_seq_num: null
+inputs:
+  patients:
+    query: |-
+      SELECT DISTINCT on (patienthealthsystemstayid)
+        uniquepid as subject_id,
+        patienthealthsystemstayid as hadm_id,
+        patientunitstayid as icustay_id,
+        gender,
+        '1900'::int AS year_of_birth
+      FROM
+        eicu_crd.patient AS patient
+      WHERE
+        (unitdischargeoffset::float / 60 / 24) >= 1
+        AND age != ''
+        AND CASE WHEN age = '> 89' THEN 300 ELSE age::int END >= 18
+      ORDER BY patienthealthsystemstayid, unitvisitnumber
+    must_have: ["gender"]
+  death:
+    query: |-
+      SELECT DISTINCT on (patienthealthsystemstayid)
+        uniquepid AS subject_id,
+        patienthealthsystemstayid AS hadm_id,
+        patientunitstayid AS icustay_id,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN age = '> 89' THEN '300' ELSE age END || ' year')::interval
+          + (unitadmittime24)::interval
+          + (unitdischargeoffset || ' minute')::interval
+        ) AS deathtime
+      FROM
+        eicu_crd.patient AS patient
+      WHERE
+        age != ''
+        AND unitdischargestatus = 'Expired'
+      ORDER BY patienthealthsystemstayid, unitvisitnumber
+    ts_col: "deathtime"
+  admissions:
+    query: |-
+      SELECT DISTINCT ON (patienthealthsystemstayid)
+        uniquepid AS subject_id,
+        patienthealthsystemstayid AS hadm_id,
+        patientunitstayid AS icustay_id,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN age = '> 89' THEN '300' ELSE age END || ' year')::interval
+          + (unitadmittime24)::interval
+        ) AS admittime,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN age = '> 89' THEN '300' ELSE age END || ' year')::interval
+          + (unitadmittime24)::interval
+          + (unitdischargeoffset || ' minute')::interval
+        ) AS dischtime
+      FROM
+        eicu_crd.patient AS patient
+      WHERE
+        age != ''
+      ORDER BY patienthealthsystemstayid, unitvisitnumber
+    start_ts_col: "admittime"
+    end_ts_col: "dischtime"
+    event_type: ["VISIT", "ADMISSION", "DISCHARGE"]
+  labs:
+    query: |-
+      SELECT
+        icustays.patientunitstayid as icustay_id,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN icustays.age = '> 89' THEN '300' ELSE icustays.age END || ' year')::interval
+          + (icustays.unitadmittime24)::interval
+          + (lab.labresultoffset || ' minute')::interval
+        ) AS charttime,
+        CASE
+          WHEN lab.labname IS NULL THEN 'NONE'
+          ELSE lab.labname
+        END AS lab,
+        lab.labresult,
+        lab.labresulttext AS text_value,
+        lab.labmeasurenamesystem,
+        lab.labmeasurenameinterface
+      FROM (
+        eicu_crd.patient AS icustays INNER JOIN eicu_crd.lab as lab
+        ON (
+          icustays.patientunitstayid = lab.patientunitstayid
+          AND 0 <= lab.labresultoffset
+          AND lab.labresultoffset <= (60 * ${observation_hrs})
+        )
+      )
+      WHERE
+        icustays.age != ''
+    ts_col: "charttime"
+  infusions:
+    query: |-
+      SELECT
+        icustays.patientunitstayid as icustay_id,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN icustays.age = '> 89' THEN '300' ELSE icustays.age END || ' year')::interval
+          + (icustays.unitadmittime24)::interval
+          + (infusiondrug.infusionoffset || ' minute')::interval
+        ) AS charttime,
+        CASE
+          WHEN infusiondrug.drugname IS NULL THEN 'NONE'
+          ELSE infusiondrug.drugname
+        END AS infusion,
+        infusiondrug.drugrate,
+        infusiondrug.infusionrate,
+        infusiondrug.drugamount,
+        infusiondrug.volumeoffluid,
+        infusiondrug.patientweight
+      FROM (
+        eicu_crd.patient AS icustays INNER JOIN eicu_crd.infusiondrug as infusiondrug
+        ON (
+          icustays.patientunitstayid = infusiondrug.patientunitstayid
+          AND 0 <= infusiondrug.infusionoffset
+          AND infusiondrug.infusionoffset <= (60 * ${observation_hrs})
+        )
+      )
+      WHERE
+        icustays.age != ''
+    ts_col: "charttime"
+  medications:
+    query: |-
+      SELECT
+        icustays.patientunitstayid as icustay_id,
+        (
+          '1900-01-01 00:00:00'::timestamp
+          + (CASE WHEN icustays.age = '> 89' THEN '300' ELSE icustays.age END || ' year')::interval
+          + (icustays.unitadmittime24)::interval
+          + (medication.drugstartoffset || ' minute')::interval
+        ) AS charttime,
+        medication.drugivadmixture,
+        CASE
+          WHEN medication.drugname IS NULL THEN 'NONE'
+          ELSE medication.drugname
+        END AS medication,
+        medication.dosage,
+        medication.routeadmin,
+        medication.frequency,
+        medication.loadingdose
+      FROM (
+        eicu_crd.patient AS icustays INNER JOIN eicu_crd.medication as medication
+        ON (
+          icustays.patientunitstayid = medication.patientunitstayid
+          AND 0 <= medication.drugstartoffset
+          AND medication.drugstartoffset <= (60 * ${observation_hrs})
+        )
+      )
+      WHERE
+        icustays.age != ''
+    ts_col: "charttime"
+measurements:
+  static:
+    single_label_classification:
+      patients: ["gender"]
+  dynamic:
+    multi_label_classification:
+      medications: 
+        - name: "medication"
+          modifiers:
+            - ["drugivadmixture", "categorical"]
+            - ["dosage", "categorical"]
+            - ["routeadmin", "categorical"]
+            - ["frequency", "categorical"]
+            - ["loadingdose", "categorical"]
+    multivariate_regression:
+      labs: 
+        - name: "lab"
+          values_column: "labresult"
+          modifiers:
+            - ["labmeasurenamesystem", "categorical"]
+            - ["labmeasurenameinterface", "categorical"]
+      infusions: 
+        - name: "infusion"
+          values_column: "drugamount"
+          modifiers:
+            - ["drugrate", "float"]
+            - ["infusionrate", "float"]
+            - ["volumeoffluid", "float"]
+            - ["patientweight", "float"]
+
+outlier_detector_config: null
+normalizer_config: null
+min_valid_vocab_element_observations: null
+min_valid_column_observations: null
+min_true_float_frequency: null
+min_unique_numerical_observations: null
+min_events_per_subject: null
+agg_by_time_scale: null
+DL_chunk_size: 4000
