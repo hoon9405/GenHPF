@@ -3,6 +3,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import h5py
 import numpy as np
+import pandas as pd
 import datasets
 from tqdm import tqdm
 
@@ -28,10 +29,13 @@ def main(args):
     # Load ESDS-compliant dataset
     # Note that any dataset can be loaded here as long as it follows ESDS schema.
     # By default, we load an example ESDS dataset extracted from EventStreamGPT.
+
+    # Note that split names should be one of ["train", "valid", "test"] for GenHPF
+    split_map = {"train": "train", "tuning": "valid", "held_out": "test"}
     ds = datasets.load_dataset(
         "parquet",
         data_files={
-            sp: str(Path(args.dataset_path) / sp / "*.parquet")
+            split_map[sp]: str(Path(args.dataset_path) / sp / "*.parquet")
             for sp in ("train", "tuning", "held_out")
         }
     )
@@ -57,9 +61,11 @@ def main(args):
 
     if not os.path.exists(os.path.join(args.output_path)):
         os.makedirs(os.path.join(args.output_path))
+    pids = {}
     with h5py.File(str(Path(args.output_path) / (args.output_name + ".h5")), "w") as f:
         ehr = f.create_group("ehr")
         for sp in tqdm(genhpf_hierarchical_ds, total=len(genhpf_flattened_ds)):
+            pids[sp] = []
             for i, patient_id in tqdm(enumerate(genhpf_hierarchical_ds[sp]["patient_id"]), total=len(genhpf_flattened_ds[sp])):
                 if genhpf_hierarchical_ds[sp][i]["events"] is None:
                     print(f"{patient_id} skipped (None events)")
@@ -69,6 +75,7 @@ def main(args):
                     print(f"{patient_id} skipped (< 5 events)")
                     continue
 
+                pids[sp].append(patient_id)
                 stay = ehr.create_group(str(patient_id))
 
                 # process hierarchical structure
@@ -147,6 +154,11 @@ def main(args):
                 )
                 stay.create_dataset("fl", data=flattened_data, dtype="i2", compression="lzf", shuffle=True)
 
+    cohort = {"icustay_id": [], "split_1": []}
+    for sp, patient_ids in pids.items():
+        cohort["icustay_id"].extend(patient_ids)
+        cohort["split_1"].extend([sp] * len(patient_ids))
+    pd.DataFrame.from_dict(cohort).to_csv(index=False)
 
 if __name__ == "__main__":
     parser = get_parser()
