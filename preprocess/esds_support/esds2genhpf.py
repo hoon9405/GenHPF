@@ -158,7 +158,7 @@ def main(args):
     for sp, patient_ids in pids.items():
         cohort["icustay_id"].extend(patient_ids)
         cohort["split_1"].extend([sp] * len(patient_ids))
-    pd.DataFrame.from_dict(cohort).to_csv(index=False)
+    pd.DataFrame.from_dict(cohort).to_csv(os.path.join(args.output_path, args.output_name + ".csv"), index=False)
 
 if __name__ == "__main__":
     parser = get_parser()
