@@ -1,16 +1,16 @@
-# Pre-processing for ESDS-Compliant Dataset
-We officially support ESDS-compliant Dataset to be processed for the GenHPF model using a set of transformation functions that converts ESDS-compliant dataset into GenHPF-formatted data that can be directly forwarded to the current GenHPF trainer and model.
+# Pre-processing for MEDS-Compliant Dataset
+We officially support MEDS-compliant Dataset to be processed for the GenHPF model using a set of transformation functions that converts MEDS-compliant dataset into GenHPF-formatted data that can be directly forwarded to the current GenHPF trainer and model.
 This currently includes pre-processing for both the hierarchical structure where the dataset has a 3-dimensinal shape of (Number of samples, Number of Events, Event Tokens), and the flattened structure where the dataset has a 2-dimensional shape of (Number of samples, Flattened Event Tokens (Number of Events * Event Tokens, potentially)).
 
 # Getting Started
 run:
 ```shell script
-$ python esds2genhpf.py \
-    --dataset_path /path/to/your/ESDS/dataset \
+$ python meds2genhpf.py \
+    --dataset_path /path/to/your/MEDS/dataset \
     --output_path /path/to/output \
     --output_name $output_name
 ```
-Note that this script currently assumes you are loading an [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) so you may need to modify the script to fit your dataset format. The example guideline for running [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) pipeline to get ESDS-compliant dataset can be also found below.  
+Note that this script currently assumes you are loading an [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) sample so you may need to modify the script to fit your dataset format. The example guideline for running [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) pipeline to get MEDS-compliant dataset can be also found below.  
 
 You also should be aware of that this script does not process labels for tasks required for the GenHPF trainer.
 To process the data with labels, you should add new columns in `$output_name.csv` where the column name is the task name and the values are labels corresponded with `icustay_id` for each row.  
@@ -25,7 +25,7 @@ icustay_id, split_1,    mortality
 ```
 
 # Example with [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT)
-For those who want to get ESDS-compliant dataset, we are providing an example guideline to run [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) pipeline for three different public EHR datasets: [MIMIC-III](https://mimic.mit.edu/docs/iii/), [MIMIC-IV](https://mimic.mit.edu/docs/iv/), and [eICU](https://eicu-crd.mit.edu/about/eicu/).
+For those who want to get MEDS-compliant dataset, we are providing an example guideline to run [Event Stream GPT](https://github.com/mmcdermott/EventStreamGPT) pipeline for three different public EHR datasets: [MIMIC-III](https://mimic.mit.edu/docs/iii/), [MIMIC-IV](https://mimic.mit.edu/docs/iv/), and [eICU](https://eicu-crd.mit.edu/about/eicu/).
 
 ## Run Event Stream GPT Pipeline
 
@@ -42,26 +42,26 @@ For those who want to get ESDS-compliant dataset, we are providing an example gu
 ### Run for MIMIC-III
 ```shell script
 $ cd example
-$ ./build_esds_dataset.sh dataset_genhpf_mimiciii $esgpt_dir do_overwrite=True
+$ ./build_meds_dataset.sh dataset_genhpf_mimiciii $esgpt_dir do_overwrite=True
 ```
 
 ### Run for MIMIC-IV
 ```shell script
 $ cd example
-$ ./build_esds_dataset.sh dataset_genhpf_mimiciv $esgpt_dir do_overwrite=True
+$ ./build_meds_dataset.sh dataset_genhpf_mimiciv $esgpt_dir do_overwrite=True
 ```
 
 ### Run for eICU
 ```shell script
 $ cd example
-$ ./build_esds_dataset.sh dataset_genhpf_eicu $esgpt_dir do_overwrite=True
+$ ./build_meds_dataset.sh dataset_genhpf_eicu $esgpt_dir do_overwrite=True
 ```
 `$esgpt_dir` is a directory to where your output will be located.
 
 ### Convert to GenHPF-formatted Dataset
 After building the ESDS-compliant datasets, run:
 ```shell script
-$ python esds2genhpf.py \
+$ python meds2genhpf.py \
     --dataset_path $esgpt_dir/ESDS \
     --output_path $output_dir \
     --output_name $output_name
