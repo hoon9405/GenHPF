@@ -152,6 +152,7 @@ dmypy.json
 
 # Experimental Folder
 outputs/*
+outputs
 
 # Weights and Biases logs
 wandb/

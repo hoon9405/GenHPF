@@ -1,0 +1,260 @@
+defaults:
+  - dataset_base
+  - _self_
+
+connection_uri: "postgres://${oc.env:USER}:@localhost:5432/mimiciii"
+save_dir: "${oc.env:PROJECT_DATA_DIR}/${cohort_name}"
+subject_id_col: "icustay_id"
+min_los: 1
+min_admissions: 1
+min_age: 18
+observation_hrs: 12
+max_icd_seq_num: null
+inputs:
+  patients:
+    query: |-
+      SELECT DISTINCT ON (icustays.hadm_id)
+        icustays.subject_id,
+        icustays.hadm_id,
+        icustays.icustay_id,
+        patients.gender,
+        extract(year from patients.dob) AS year_of_birth
+      FROM (
+        mimiciii.icustays AS icustays INNER JOIN mimiciii.patients AS patients
+        ON icustays.subject_id = patients.subject_id
+      )
+      WHERE 
+        icustays.los >= ${min_los}
+        AND extract(year from age(icustays.intime, patients.dob)) >= ${min_age}
+        AND icustays.first_careunit = last_careunit
+      ORDER BY icustays.hadm_id, icustays.intime
+    must_have: ["year_of_birth"]
+  death:
+    query: |-
+      SELECT DISTINCT ON (icustays.hadm_id)
+        icustays.subject_id,
+        icustays.hadm_id,
+        icustays.icustay_id,
+        admissions.deathtime
+      FROM (
+        mimiciii.icustays as icustays INNER JOIN mimiciii.admissions AS admissions
+        ON icustays.hadm_id = admissions.hadm_id
+      )
+      WHERE admissions.deathtime IS NOT NULL
+      ORDER BY icustays.hadm_id, icustays.intime
+    ts_col: "deathtime"
+  admissions:
+    query: |-
+      SELECT DISTINCT ON (icustays.hadm_id)
+        icustays.subject_id,
+        icustays.hadm_id,
+        icustays.icustay_id,
+        admissions.admittime,
+        admissions.dischtime
+      FROM (
+        mimiciii.icustays as icustays INNER JOIN mimiciii.admissions AS admissions
+        ON icustays.hadm_id = admissions.hadm_id
+      )
+      ORDER BY icustays.hadm_id, icustays.intime
+    start_ts_col: "admittime"
+    end_ts_col: "dischtime"
+    event_type: ["VISIT", "ADMISSION", "DISCHARGE"]
+  icu_stays:
+    query: "SELECT * FROM mimiciii.icustays"
+    start_ts_col: "intime"
+    end_ts_col: "outtime"
+  labs:
+    query:
+      - |-
+        SELECT
+          icustays.icustay_id,
+          labevents.charttime,
+          CASE
+            WHEN labevents.label IS NULL THEN 'NONE'
+            ELSE labevents.label
+          END AS lab,
+          labevents.value AS text_value,
+          labevents.valuenum,
+          labevents.valueuom,
+          labevents.flag
+        FROM (
+          mimiciii.icustays AS icustays INNER JOIN (
+            mimiciii.labevents INNER JOIN (
+              SELECT itemid, label FROM mimiciii.d_labitems
+            ) AS d_items
+            ON d_items.itemid = mimiciii.labevents.itemid
+          ) AS labevents
+          ON (
+            labevents.hadm_id = icustays.hadm_id
+            AND icustays.intime <= labevents.charttime
+            AND labevents.charttime <= icustays.outtime
+            AND labevents.charttime <= icustays.intime + '${observation_hrs} hours'::interval
+          )
+        )
+    ts_col: "charttime"
+  infusions:
+    query: 
+    - |-
+      SELECT
+        icustays.icustay_id,
+        CASE
+          WHEN inputevents_mv_ditems.label IS NULL THEN 'NONE'
+          ELSE inputevents_mv_ditems.label
+        END AS infusion,
+        inputevents_mv_ditems.amount,
+        inputevents_mv_ditems.amountuom,
+        inputevents_mv_ditems.rate,
+        inputevents_mv_ditems.rateuom,
+        NULL AS newbottle,
+        inputevents_mv_ditems.originalamount,
+        NULL AS originalamountuom,
+        inputevents_mv_ditems.ordercategoryname,
+        inputevents_mv_ditems.secondaryordercategoryname,
+        inputevents_mv_ditems.ordercomponenttypedescription,
+        inputevents_mv_ditems.ordercategorydescription,
+        inputevents_mv_ditems.patientweight,
+        inputevents_mv_ditems.totalamount,
+        inputevents_mv_ditems.totalamountuom,
+        inputevents_mv_ditems.isopenbag,
+        NULL AS originalroute,
+        inputevents_mv_ditems.originalrate,
+        NULL AS originalrateuom,
+        NULL AS originalsite,
+        inputevents_mv_ditems.starttime
+      FROM (
+        mimiciii.icustays AS icustays
+        INNER JOIN (
+          mimiciii.inputevents_mv AS inputevents_mv INNER JOIN mimiciii.d_items AS d_items
+          ON inputevents_mv.itemid = d_items.itemid
+        ) AS inputevents_mv_ditems
+        ON (
+          inputevents_mv_ditems.icustay_id = icustays.icustay_id
+          AND inputevents_mv_ditems.starttime <= icustays.intime + '${observation_hrs} hours'::interval
+        )
+      )
+    - |-
+      SELECT
+        icustays.icustay_id,
+        CASE
+          WHEN inputevents_cv_ditems.label IS NULL THEN 'NONE'
+          ELSE inputevents_cv_ditems.label
+        END AS infusion,
+        inputevents_cv_ditems.amount,
+        inputevents_cv_ditems.amountuom,
+        inputevents_cv_ditems.rate,
+        inputevents_cv_ditems.rateuom,
+        inputevents_cv_ditems.newbottle,
+        inputevents_cv_ditems.originalamount,
+        inputevents_cv_ditems.originalamountuom,
+        NULL AS ordercategoryname,
+        NULL AS secondaryordercategoryname,
+        NULL AS ordercomponenttypedescription,
+        NULL AS ordercategorydescription,
+        NULL AS patientweight,
+        NULL AS totalamount,
+        NULL AS totalamountuom,
+        NULL AS isopenbag,
+        inputevents_cv_ditems.originalroute,
+        inputevents_cv_ditems.originalrate,
+        inputevents_cv_ditems.originalrateuom,
+        inputevents_cv_ditems.originalsite,
+        inputevents_cv_ditems.charttime AS starttime
+      FROM (
+        mimiciii.icustays AS icustays
+        INNER JOIN (
+          mimiciii.inputevents_cv AS inputevents_cv INNER JOIN mimiciii.d_items AS d_items
+          ON inputevents_cv.itemid = d_items.itemid
+        ) AS inputevents_cv_ditems
+        ON (
+          inputevents_cv_ditems.icustay_id = icustays.icustay_id
+          AND icustays.intime <= inputevents_cv_ditems.charttime
+          AND inputevents_cv_ditems.charttime <= icustays.intime + '${observation_hrs} hours'::interval
+        )
+      )
+    ts_col: "starttime"
+  medications:
+    query: |-
+      SELECT
+        icustays.icustay_id,
+        prescriptions.startdate,
+        prescriptions.drug_type,
+        CASE
+          WHEN prescriptions.drug IS NULL THEN 'NONE'
+          ELSE prescriptions.drug
+        END AS medication,
+        prescriptions.drug_name_poe,
+        prescriptions.drug_name_generic,
+        prescriptions.prod_strength,
+        prescriptions.dose_val_rx,
+        prescriptions.dose_unit_rx,
+        prescriptions.form_val_disp,
+        prescriptions.form_unit_disp,
+        prescriptions.route
+      FROM (
+        mimiciii.icustays AS icustays INNER JOIN mimiciii.prescriptions AS prescriptions
+        ON (
+          prescriptions.hadm_id = icustays.hadm_id
+          AND icustays.intime <= prescriptions.startdate
+          AND prescriptions.startdate <= icustays.outtime
+          AND prescriptions.startdate <= icustays.intime + '${observation_hrs} hours'::interval
+        )
+      )
+    ts_col: "startdate"
+
+measurements:
+  static:
+    single_label_classification:
+      patients: ["gender"]
+  dynamic:
+    multi_label_classification:
+      medications: 
+        - name: "medication"
+          modifiers:
+            - ["drug_type", "categorical"]
+            - ["drug_name_poe", "categorical"]
+            - ["drug_name_generic", "categorical"]
+            - ["prod_strength", "categorical"]
+            - ["dose_val_rx", "categorical"]
+            - ["dose_unit_rx", "categorical"]
+            - ["form_val_disp", "categorical"]
+            - ["form_unit_disp", "categorical"]
+            - ["route", "categorical"]
+    multivariate_regression:
+      labs: 
+        - name: "lab"
+          values_column: "valuenum"
+          modifiers:
+            - ["valueuom", "categorical"]
+            - ["flag", "categorical"]
+      infusions: 
+        - name: "infusion"
+          values_column: "amount"
+          modifiers:
+            - ["amountuom", "categorical"]
+            - ["rate", "float"]
+            - ["rateuom", "categorical"]
+            - ["newbottle", "categorical"]
+            - ["originalamount", "float"]
+            - ["originalamountuom", "categorical"]
+            - ["ordercategoryname", "categorical"]
+            - ["secondaryordercategoryname", "categorical"]
+            - ["ordercomponenttypedescription", "categorical"]
+            - ["ordercategorydescription", "categorical"]
+            - ["patientweight", "float"]
+            - ["totalamount", "float"]
+            - ["totalamountuom", "categorical"]
+            - ["isopenbag", "boolean"]
+            - ["originalroute", "categorical"]
+            - ["originalrate", "float"]
+            - ["originalrateuom", "categorical"]
+            - ["originalsite", "categorical"]
+
+outlier_detector_config: null
+normalizer_config: null
+min_valid_vocab_element_observations: null
+min_valid_column_observations: null
+min_true_float_frequency: null
+min_unique_numerical_observations: null
+min_events_per_subject: null
+agg_by_time_scale: null
+DL_chunk_size: 4000
