@@ -76,60 +76,70 @@ Note that `--input-path ` should be the root directory containing preprocessed d
 ### Train a new GenHPF model:
 
 ```shell script
-$ python main.py \
+$ CUDA_VISIBLE_DEVICES=1 \
+    python main.py \
     --input_path /path/to/data \
     --model_run GenHPF \
     --train_task scratch \
-    --src_data $data \
+    --train_src $data \
     --pred_task $pred_task \
+    --criterion prediction \
     --batch_size $batch_size \
-    --device_num $device_num \
+    --world_size $world_size \
 ```
 Note: if you want to train with baselines, set model_run as baseline model, one of (Rajikomar, DescEmb, SAnd).
 
 ### Pre-train GenHPF model:
 
 ```shell script
-$ python main.py \
+$ CUDA_VISIBLE_DEVICES=1 \
+    python main.py \
     --input_path /path/to/data \
     --model_run GenHPF \
     --model GenHPF_simclr \
-    --src_data $data \
+    --train_src $data \
     --train_task pretrain  \
     --pretrain_task $pretrain_task \
+    --criterion $criterion \
     --batch_size $batch_size \
-    --device_num $device_num \
+    --world_size $world_size \
+    --valid_subset "" \
+    
 ```
 
 Note: if you want to train with pre-trained model, add command line parameters `--load_checkpoint` with directory of pre-trained model checkpoint and set `train_task` as `finetune`.
 
 ## Pooled learning 
 ```shell script
-$ python main.py \
+$ CUDA_VISIBLE_DEVICES=1 \
+    python main.py \
     --input_path /path/to/data \
     --model_run GenHPF \
     --train_task scratch \
-    --src_data mimiciii_eicu_mimiciv \
+    --train_src mimiciii_eicu_mimiciv \
     --pred_task $pred_task \
+    --criterion prediction \
     --batch_size $batch_size \
-    --device_num $device_num \
+    --world_size $world_size \
 ```
 
-Note: Please refer main.py argument ('src_data') for pooled learning.
+Note: Please refer main.py argument ('train_src') for pooled learning.
 
 ## Transfer learning
 ```shell script
-$ python main.py \
+$ CUDA_VISIBLE_DEVICES=1 \
+    python main.py \
     --input_path /path/to/data \
     --model GenHPF \
     –ratio 0 \
-    --src_data mimiciii \
+    --train_src mimiciii \
     --target_data eicu \
     --train_task finetune  \
     --pred_task $pred_task \
+    --criterion prediction \
     --pretrain $scratch \
     --batch_size $batch_size \
-    --device_num $device_num \
+    --world_size $world_size \
     --load_checkpoint $saved_ckpt \
 ```
 

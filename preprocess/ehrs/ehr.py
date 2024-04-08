@@ -527,10 +527,7 @@ class EHR(object):
                         self.table_feature_dict[k] = max(self.table_feature_dict.values())+1+i
                 
                 print('length of codebook = ', len(self.table_feature_dict))
-                # for i, (k,v) in enumerate(self.table_feature_dict.items()):
-                #     print(k,v)
-                #     if i > 200:
-                #         break
+
                 events = events.fillna(' ')
                 events=spark.createDataFrame(events)
                 print("Converted Events DataFrame to Pyspark DataFrame")
@@ -638,6 +635,7 @@ class EHR(object):
             events_dfs.append(events)
             
         if self.emb_type=='codebase':
+            os.makedirs(os.path.join(self.cache_dir, self.ehr_name), exist_ok=True)
             with open(os.path.join(self.cache_dir, self.ehr_name, f"codebase_code2idx_{self.feature}.pkl"), "wb") as f:
                 pickle.dump(self.table_feature_dict, f)
                 

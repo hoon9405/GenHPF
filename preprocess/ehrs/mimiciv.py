@@ -528,13 +528,13 @@ class MIMICIV(EHR):
     
     def infer_data_extension(self) -> str:
         if (
-            len(glob.glob(os.path.join(self.data_dir, "hosp", "*.csv.gz"))) == 21
-            or len(glob.glob(os.path.join(self.data_dir, "icu", "*.csv.gz"))) == 8
+            len(glob.glob(os.path.join(self.data_dir, "hosp", "*.csv.gz"))) == 22
+            or len(glob.glob(os.path.join(self.data_dir, "icu", "*.csv.gz"))) == 9
         ):
             ext = ".csv.gz"
         elif (
-            len(glob.glob(os.path.join(self.data_dir, "hosp", "*.csv")))==21
-            or len(glob.glob(os.path.join(self.data_dir, "icu", "*.csv")))==8
+            len(glob.glob(os.path.join(self.data_dir, "hosp", "*.csv")))==22
+            or len(glob.glob(os.path.join(self.data_dir, "icu", "*.csv")))==9
         ):
             ext = ".csv"
         else:
