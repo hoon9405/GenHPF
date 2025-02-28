@@ -28,14 +28,6 @@ def get_parser():
     parser.add_argument(
         "--dest", default="outputs", type=str, metavar="DIR", help="output directory"
     )
-    parser.add_argument(
-        "--valid-percent",
-        default=0.1,
-        type=float,
-        metavar="D",
-        help="percentage of data to use as validation and test set (between 0 and 0.5)",
-    )
-    parser.add_argument("--seed", default="42", type=str, metavar="N", help="random seed")
 
     # data
     parser.add_argument(
@@ -198,11 +190,6 @@ def get_parser():
     )
     parser.add_argument(
         '--bucket_num', type=int, default=10, help='feature bucket num'
-    )
-    
-    # Only Lab tables
-    parser.add_argument(
-        '--lab_only', action="store_true", help='only lab table use'
     )
     return parser
 

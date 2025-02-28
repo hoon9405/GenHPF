@@ -27,11 +27,13 @@ class EHR(object):
 
         self.cache = cfg.cache
         
-        cache_dir = os.path.expanduser("~./cache/ehr")
+        cache_dir = os.path.expanduser("~/.cache/ehr")
         #cache_dir = self.cfg.dest
         if not os.path.exists(cache_dir):
             os.makedirs(cache_dir)
         self.cache_dir = cache_dir
+
+        
 
         if self.cache:
             logger.warn(
@@ -96,11 +98,11 @@ class EHR(object):
         self.chunk_size = cfg.chunk_size
 
         self.dest = cfg.dest
-        self.valid_percent = cfg.valid_percent
-        self.seed = [int(s) for s in cfg.seed.replace(' ','').split(",")]
-        assert 0 <= cfg.valid_percent and cfg.valid_percent <= 0.5
 
         self.bins = cfg.bins
+
+        os.makedirs(os.path.join(self.dest,"data"), exist_ok=True)
+        os.makedirs(os.path.join(self.dest,"metadata"), exist_ok=True)
 
         self.special_tokens_dict = dict()
         self.max_special_tokens = 100
@@ -217,6 +219,7 @@ class EHR(object):
                 len(icustays)
             )
         )
+
         self.save_to_cache(icustays, self.ehr_name + ".cohorts")
 
         return icustays
@@ -306,7 +309,7 @@ class EHR(object):
                 ] = "IN_HOSPITAL_MORTALITY"
                 # NOTE we drop null value samples #TODO
 
-                with open(os.path.join(self.dest, self.ehr_name + "_final_acuity_classes.tsv"), "w") as f:
+                with open(os.path.join(self.dest,  "metadata/final_acuity_classes.tsv"), "w") as f:
                     for i, cat in enumerate(
                         labeled_cohorts["final_acuity"].astype("category").cat.categories
                     ):
@@ -338,7 +341,7 @@ class EHR(object):
                 # NOTE we drop null value samples #TODO
 
                 with open(
-                    os.path.join(self.dest, self.ehr_name + "_imminent_discharge_classes.tsv"), "w"
+                    os.path.join(self.dest, "metadata/imminent_discharge_classes.tsv"), "w"
                 ) as f:
                     for i, cat in enumerate(
                         labeled_cohorts["imminent_discharge"].astype("category").cat.categories
@@ -379,9 +382,7 @@ class EHR(object):
             print("Converted Cohort to Pyspark DataFrame")
         else:
             logger.info("Start Preprocessing Tables")
-        
-        if self.cfg.lab_only:
-            self.tables = [self.tables[0]]    
+         
         events_dfs = []
         for table_index, table in enumerate(self.tables):
             fname = table["fname"]
@@ -701,14 +702,13 @@ class EHR(object):
                 pickle.dump(data, f)
             return events["TIME"].to_frame()
 
-        #shutil.rmtree(os.path.join(self.cache_dir, self.ehr_name, self.emb_type, self.feature), ignore_errors=True)
         os.makedirs(os.path.join(self.cache_dir, self.ehr_name, self.emb_type, self.feature), exist_ok=True)
 
         events.groupBy(self.icustay_key).apply(_make_input).write.mode("overwrite").format("noop").save()
 
         logger.info("Finish Data Preprocessing. Start to write to hdf5")
 
-        f = h5py.File(os.path.join(self.dest, f"{self.emb_type}_{self.feature}_{self.ehr_name}.h5"), "w")
+        f = h5py.File(os.path.join(self.dest, f"data/data.h5"), "w")
         ehr_g = f.create_group("ehr")
 
         active_stay_ids = []
@@ -723,36 +723,45 @@ class EHR(object):
             stay_g.create_dataset('time', data = data['time'], dtype='i')
             active_stay_ids.append(int(stay_id))
 
-        #shutil.rmtree(os.path.join(self.cache_dir, self.ehr_name, self.emb_type, self.feature), ignore_errors=True)
+        shutil.rmtree(os.path.join(self.cache_dir, self.ehr_name, self.emb_type, self.feature), ignore_errors=True)
         # Drop patients with few events
 
-        if not isinstance(cohorts, pd.DataFrame): #Spark to Pandas ?
+        if not isinstance(cohorts, pd.DataFrame): 
             cohorts = cohorts.toPandas()
             print(cohorts)
+
+       
 
         logger.info("Total {} patients in the cohort are skipped due to few events".format(len(cohorts) - len(active_stay_ids)))
         cohorts = cohorts[cohorts[self.icustay_key].isin(active_stay_ids)]
 
         # Should consider pat_id for split
-        for seed in self.seed:
-            shuffled = cohorts.groupby(self.patient_key)[self.patient_key].count().sample(frac=1, random_state=seed)
-            cum_len = shuffled.cumsum()
+        # for seed in self.seed:
+        #     shuffled = cohorts.groupby(self.patient_key)[self.patient_key].count().sample(frac=1, random_state=seed)
+        #     cum_len = shuffled.cumsum()
 
-            cohorts.loc[cohorts[self.patient_key].isin(
-                shuffled[cum_len < int(sum(shuffled)*self.valid_percent)].index), f'split_{seed}'] = 'test'
-            cohorts.loc[cohorts[self.patient_key].isin(
-                shuffled[(cum_len >= int(sum(shuffled)*self.valid_percent)) 
-                & (cum_len < int(sum(shuffled)*2*self.valid_percent))].index), f'split_{seed}'] = 'valid'
-            cohorts.loc[cohorts[self.patient_key].isin(
-                shuffled[cum_len >= int(sum(shuffled)*2*self.valid_percent)].index), f'split_{seed}'] = 'train'
-
-        cohorts.to_csv(os.path.join(self.dest, f'{self.ehr_name}_cohort.csv'), index=False)
+        #     cohorts.loc[cohorts[self.patient_key].isin(
+        #         shuffled[cum_len < int(sum(shuffled)*self.valid_percent)].index), f'split_{seed}'] = 'test'
+        #     cohorts.loc[cohorts[self.patient_key].isin(
+        #         shuffled[(cum_len >= int(sum(shuffled)*self.valid_percent)) 
+        #         & (cum_len < int(sum(shuffled)*2*self.valid_percent))].index), f'split_{seed}'] = 'valid'
+        #     cohorts.loc[cohorts[self.patient_key].isin(
+        #         shuffled[cum_len >= int(sum(shuffled)*2*self.valid_percent)].index), f'split_{seed}'] = 'train'
+        
+         # select columns stay_id and tasks
+        task_columns = ['mortality', 'long_term_mortality', 'los_3day', 'los_7day', 
+                       'readmission', 'final_acuity', 'imminent_discharge']
+        selected_columns = [self.icustay_key] + [col for col in task_columns if col in cohorts.columns]
+        cohorts = cohorts[selected_columns]
+        cohorts.rename(columns={self.icustay_key: 'stay_id'}, inplace=True)
+        
+        cohorts.to_csv(os.path.join(self.dest, 'data/label.csv'), index=False)
 
         # Record corhots df to hdf5
         for _, row in cohorts.iterrows():
-            group = ehr_g[str(row[self.icustay_key])]
+            group = ehr_g[str(row['stay_id'])]
             for col in cohorts.columns:
-                if col in ["INTIME", "OUTTIME"] or isinstance(row[col], (pd.Timestamp, pd.Timedelta)):
+                if isinstance(row[col], (pd.Timestamp, pd.Timedelta)):
                     continue
                 group.attrs[col] = row[col]
         f.close()
