@@ -306,9 +306,7 @@ class EHR(object):
                 labeled_cohorts.loc[
                     labeled_cohorts["IN_HOSPITAL_MORTALITY"] == 1, "final_acuity"
                 ] = "IN_HOSPITAL_MORTALITY"
-                # Replace -1 with NaN
-                labeled_cohorts.loc[labeled_cohorts["final_acuity"] == -1, "final_acuity"] = np.nan
-
+                
                 with open(os.path.join(self.dest,  "metadata/final_acuity_classes.tsv"), "w") as f:
                     for i, cat in enumerate(
                         labeled_cohorts["final_acuity"].astype("category").cat.categories
@@ -317,7 +315,8 @@ class EHR(object):
                 labeled_cohorts["final_acuity"] = (
                     labeled_cohorts["final_acuity"].astype("category").cat.codes
                 )
-
+                # Replace -1 with NaN
+                labeled_cohorts.loc[labeled_cohorts["final_acuity"] == -1, "final_acuity"] = np.nan
             if self.imminent_discharge:
                 # define imminent discharge prediction task
                 is_discharged = (
@@ -338,8 +337,6 @@ class EHR(object):
                     "imminent_discharge"
                 ] = "Death"
                 labeled_cohorts.loc[~is_discharged, "imminent_discharge"] = "No Discharge"
-                # Replace -1 with NaN
-                labeled_cohorts.loc[labeled_cohorts["imminent_discharge"] == -1, "imminent_discharge"] = np.nan
 
                 with open(
                     os.path.join(self.dest, "metadata/imminent_discharge_classes.tsv"), "w"
@@ -351,7 +348,8 @@ class EHR(object):
                 labeled_cohorts["imminent_discharge"] = (
                     labeled_cohorts["imminent_discharge"].astype("category").cat.codes
                 )
-
+                # Replace -1 with NaN
+                labeled_cohorts.loc[labeled_cohorts["imminent_discharge"] == -1, "imminent_discharge"] = np.nan
             labeled_cohorts = labeled_cohorts.drop(
                 columns=["IN_HOSPITAL_MORTALITY"]
             )
