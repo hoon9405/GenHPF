@@ -298,7 +298,6 @@ class EHR(object):
             ).astype(int)
 
             if self.final_acuity:
-
                 # define final acuity prediction task
                 labeled_cohorts["final_acuity"] = labeled_cohorts["HOS_DISCHARGE_LOCATION"]
                 labeled_cohorts.loc[
@@ -307,7 +306,8 @@ class EHR(object):
                 labeled_cohorts.loc[
                     labeled_cohorts["IN_HOSPITAL_MORTALITY"] == 1, "final_acuity"
                 ] = "IN_HOSPITAL_MORTALITY"
-                # NOTE we drop null value samples #TODO
+                # Replace -1 with NaN
+                labeled_cohorts.loc[labeled_cohorts["final_acuity"] == -1, "final_acuity"] = np.nan
 
                 with open(os.path.join(self.dest,  "metadata/final_acuity_classes.tsv"), "w") as f:
                     for i, cat in enumerate(
@@ -319,7 +319,7 @@ class EHR(object):
                 )
 
             if self.imminent_discharge:
-            # define imminent discharge prediction task
+                # define imminent discharge prediction task
                 is_discharged = (
                     (
                         self.obs_size * 60 + self.gap_size * 60 <= labeled_cohorts["DISCHTIME"]
@@ -338,7 +338,8 @@ class EHR(object):
                     "imminent_discharge"
                 ] = "Death"
                 labeled_cohorts.loc[~is_discharged, "imminent_discharge"] = "No Discharge"
-                # NOTE we drop null value samples #TODO
+                # Replace -1 with NaN
+                labeled_cohorts.loc[labeled_cohorts["imminent_discharge"] == -1, "imminent_discharge"] = np.nan
 
                 with open(
                     os.path.join(self.dest, "metadata/imminent_discharge_classes.tsv"), "w"
