@@ -3,21 +3,20 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-
 import torch
 import torch.nn.functional as F
 
-from genhpf.configs import BaseConfig
-from genhpf.loggings import metrics, meters
-from genhpf.loggings.meters import safe_round
-from genhpf.criterions import BaseCriterion, register_criterion
 import genhpf.utils.utils as utils
+from genhpf.configs import BaseConfig
+from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.loggings import meters, metrics
+from genhpf.loggings.meters import safe_round
+
 
 @dataclass
 class BinaryCrossEntropyConfig(BaseConfig):
-    threshold: float = field(
-        default=0.5, metadata={"help": "threshold value for binary classification"}
-    )
+    threshold: float = field(default=0.5, metadata={"help": "threshold value for binary classification"})
+
 
 @register_criterion("binary_cross_entropy", dataclass=BinaryCrossEntropyConfig)
 class BinaryCrossEntropy(BaseCriterion):
@@ -27,12 +26,7 @@ class BinaryCrossEntropy(BaseCriterion):
         self.threshold = cfg.threshold
 
     def compute_loss(
-        self,
-        logits: torch.Tensor,
-        targets: torch.Tensor,
-        sample=None,
-        net_output=None,
-        model=None
+        self, logits: torch.Tensor, targets: torch.Tensor, sample=None, net_output=None, model=None
     ) -> Tuple[torch.Tensor, List[float]]:
         logits = logits.flatten()
         targets = targets.float()
@@ -52,7 +46,7 @@ class BinaryCrossEntropy(BaseCriterion):
     ) -> List[Dict[str, Any]]:
         with torch.no_grad():
             probs = torch.sigmoid(logits.flatten())
-            outputs = (probs > self.threshold)
+            outputs = probs > self.threshold
 
             if probs.numel() == 0:
                 corr = 0
@@ -60,7 +54,7 @@ class BinaryCrossEntropy(BaseCriterion):
             else:
                 count = float(probs.numel())
                 corr = (outputs == targets).sum().item()
-            
+
             logging_output["correct"] = corr
             logging_output["count"] = count
 
@@ -68,7 +62,7 @@ class BinaryCrossEntropy(BaseCriterion):
             if not self.training:
                 logging_output["_y_true"] = targets.cpu().numpy()
                 logging_output["_y_score"] = probs.cpu().numpy()
-        
+
         return logging_output
 
     @staticmethod
@@ -81,17 +75,13 @@ class BinaryCrossEntropy(BaseCriterion):
 
         loss_sum = utils.item(sum(log.get("loss", 0) for log in logging_outputs))
 
-        sample_size = utils.item(
-            sum(log.get("sample_size", 0) for log in logging_outputs)
-        )
+        sample_size = utils.item(sum(log.get("sample_size", 0) for log in logging_outputs))
 
-        metrics.log_scalar( 
-            f"{prefix}loss", loss_sum / (sample_size or 1) / math.log(2), sample_size, round=3
-        )
+        metrics.log_scalar(f"{prefix}loss", loss_sum / (sample_size or 1) / math.log(2), sample_size, round=3)
 
         if "_y_true" in logging_outputs[0] and "_y_score" in logging_outputs[0]:
-            y_true = np.concatenate([log.get("_y_true", 0) for log in logging_outputs])
-            y_score = np.concatenate([log.get("_y_score", 0) for log in logging_outputs])
+            y_true = np.concatenate([log.get("_y_true", []) for log in logging_outputs])
+            y_score = np.concatenate([log.get("_y_score", []) for log in logging_outputs])
 
             metrics.log_custom(meters.AUCMeter, f"_{prefix}auc", y_score, y_true)
 
@@ -104,11 +94,9 @@ class BinaryCrossEntropy(BaseCriterion):
         if total > 0:
             metrics.log_derived(
                 f"{prefix}accuracy",
-                lambda meters: safe_round(
-                    meters[f"_{prefix}correct"].sum / meters[f"_{prefix}total"].sum, 5
-                )
+                lambda meters: safe_round(meters[f"_{prefix}correct"].sum / meters[f"_{prefix}total"].sum, 5)
                 if meters[f"_{prefix}total"].sum > 0
-                else float("nan")
+                else float("nan"),
             )
 
     def post_validate(self, stats, agg, **kwargs):
@@ -116,5 +104,5 @@ class BinaryCrossEntropy(BaseCriterion):
             if key.startswith("_") and key.endswith("auc"):
                 stats[key[1:-3] + "auroc"] = agg[key].auroc
                 stats[key[1:-3] + "auprc"] = agg[key].auprc
-        
+
         return stats

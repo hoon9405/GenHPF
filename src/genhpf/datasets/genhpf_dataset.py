@@ -1,20 +1,15 @@
-import os
-import sys
-import tqdm
 import logging
-import random
-import collections
-from typing import Union, List
+from typing import List, Union
 
-import torch
-import torch.nn.functional as F
+import h5pickle
 import numpy as np
 import pandas as pd
-import h5pickle
+import torch
 
 from genhpf.datasets.dataset import BaseDataset
 
 logger = logging.getLogger(__name__)
+
 
 class GenHPFDataset(BaseDataset):
     def __init__(
@@ -32,6 +27,8 @@ class GenHPFDataset(BaseDataset):
         simclr: bool = False,
         **kwargs,
     ):
+        super().__init__()
+
         if structure == "hierarchical":
             structure = "hi"
         elif structure == "flattened":
@@ -74,9 +71,10 @@ class GenHPFDataset(BaseDataset):
 
     def __len__(self):
         return len(self.subjects)
-    
+
     def __getitem__(self, index):
         raise NotImplementedError
+
 
 class HierarchicalGenHPFDataset(GenHPFDataset):
     def __init__(
@@ -86,14 +84,10 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
         tasks: List[str] = None,
         num_labels: List[int] = None,
         dummy_token_id: int = 101,
-        **kwargs
+        **kwargs,
     ):
         kwargs.pop("structure", None)
-        super().__init__(
-            manifest_paths=manifest_paths,
-            structure="hierarchical",
-            **kwargs
-        )
+        super().__init__(manifest_paths=manifest_paths, structure="hierarchical", **kwargs)
 
         self.label = label
         self.tasks = tasks
@@ -111,15 +105,31 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
             return {}
 
         if self.simclr:
-            # TODO
-            # 1. halve input_ids, ..., times
-            # 2. apply (1) to _labels as well
-            raise NotImplementedError
+            input_ids = sum(
+                [
+                    [s["input_ids"][: len(s["input_ids"]) // 2], s["input_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
+            type_ids = sum(
+                [
+                    [s["type_ids"][: len(s["input_ids"]) // 2], s["type_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
+            dpe_ids = sum(
+                [
+                    [s["dpe_ids"][: len(s["input_ids"]) // 2], s["dpe_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
         else:
             input_ids = [s["input_ids"] for s in samples]
             type_ids = [s["type_ids"] for s in samples]
             dpe_ids = [s["dpe_ids"] for s in samples]
-            times = [s["times"] for s in samples]
 
         sizes = [s.size(0) for s in input_ids]
         target_size = max(sizes)
@@ -127,34 +137,39 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
         collated_input_ids = (
             input_ids[0].new_zeros((len(input_ids), target_size, len(input_ids[0][0]))).long()
         )
-        collated_type_ids = (
-            type_ids[0].new_zeros((len(type_ids), target_size, len(type_ids[0][0]))).long()
-        )
-        collated_dpe_ids = (
-            dpe_ids[0].new_zeros((len(dpe_ids), target_size, len(dpe_ids[0][0]))).long()
-        )
-        collated_times = times[0].new_zeros((len(times), target_size)).long()
+        collated_type_ids = type_ids[0].new_zeros((len(type_ids), target_size, len(type_ids[0][0]))).long()
+        collated_dpe_ids = dpe_ids[0].new_zeros((len(dpe_ids), target_size, len(dpe_ids[0][0]))).long()
         for i, size in enumerate(sizes):
             diff = size - target_size
             if diff == 0:
                 collated_input_ids[i] = input_ids[i]
                 collated_type_ids[i] = type_ids[i]
                 collated_dpe_ids[i] = dpe_ids[i]
-                collated_times[i] = times[i]
             elif diff < 0:
                 collated_input_ids[i] = torch.cat(
-                    [input_ids[i], input_ids[i].new_zeros(-diff, len(input_ids[i][0])),], dim=0
+                    [
+                        input_ids[i],
+                        input_ids[i].new_zeros(-diff, len(input_ids[i][0])),
+                    ],
+                    dim=0,
                 )
                 # add dummy token to the start of each padded event as the event encoder can be
                 # crushed when all the input tokens are pad tokens
                 collated_input_ids[i][diff:, 0] = self.dummy_token_id
                 collated_type_ids[i] = torch.cat(
-                    [type_ids[i], type_ids[i].new_zeros(-diff, len(type_ids[i][0])),], dim=0
+                    [
+                        type_ids[i],
+                        type_ids[i].new_zeros(-diff, len(type_ids[i][0])),
+                    ],
+                    dim=0,
                 )
                 collated_dpe_ids[i] = torch.cat(
-                    [dpe_ids[i], dpe_ids[i].new_zeros(-diff, len(dpe_ids[i][0])),], dim=0
+                    [
+                        dpe_ids[i],
+                        dpe_ids[i].new_zeros(-diff, len(dpe_ids[i][0])),
+                    ],
+                    dim=0,
                 )
-                collated_times[i] = torch.cat([times[i], times[i].new_zeros(-diff,)], dim=0)
             else:
                 raise ValueError(f"size mismatch, expected <={target_size}, got {size}")
 
@@ -163,7 +178,6 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
             "input_ids": collated_input_ids,
             "type_ids": collated_type_ids,
             "dpe_ids": collated_dpe_ids,
-            "times": collated_times,
         }
 
         if self.label:
@@ -176,8 +190,7 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
 
     def __getitem__(self, index):
         data_index, subject = self.subjects[index]
-        data = self.data[data_index][subject][self.structure]
-        times = np.array(self.data[data_index][subject]["time"])
+        data = self.data[data_index][subject][self.structure][:]
 
         if self.apply_mask:
             data = self.mask(
@@ -194,7 +207,6 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
             "input_ids": torch.LongTensor(data[:, 0, :]),
             "type_ids": torch.LongTensor(data[:, 1, :]),
             "dpe_ids": torch.LongTensor(data[:, 2, :]),
-            "times": torch.LongTensor(times),
         }
 
         if self.label:
@@ -215,21 +227,18 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
                     ret[task] = torch.tensor(ret[task])
         return ret
 
-class FlattenedGenHPFDataset(BaseDataset):
+
+class FlattenedGenHPFDataset(GenHPFDataset):
     def __init__(
         self,
         manifest_paths: List[str],
         label: bool = False,
         tasks: List[str] = None,
         num_labels: List[int] = None,
-        **kwargs
+        **kwargs,
     ):
         kwargs.pop("structure", None)
-        super().__init__(
-            manifest_paths=manifest_paths,
-            structure="flattened",
-            **kwargs
-        )
+        super().__init__(manifest_paths=manifest_paths, structure="flattened", **kwargs)
 
         self.label = label
         self.tasks = tasks
@@ -246,40 +255,64 @@ class FlattenedGenHPFDataset(BaseDataset):
 
     def pad_to_max_size(self, sample, max_len):
         if len(sample) < max_len:
-            sample = np.concatenate(
-                [sample, np.zeros(max_len - len(sample), dtype=np.int16)]
-            )
+            sample = np.concatenate([sample, np.zeros(max_len - len(sample), dtype=np.int16)])
         else:
             sample = sample[:max_len]
         return sample
 
     def collator(self, samples):
-        samples = [s for s in samples if s['input_ids'] is not None]
+        samples = [s for s in samples if s["input_ids"] is not None]
         if len(samples) == 0:
             return {}
 
         if self.simclr:
-            # TODO
-            # 1. halve input_ids, ..., times
-            # 2. apply (1) to _labels as well
-            raise NotImplementedError
+            input_ids = sum(
+                [
+                    [s["input_ids"][: len(s["input_ids"]) // 2], s["input_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
+            type_ids = sum(
+                [
+                    [s["type_ids"][: len(s["input_ids"]) // 2], s["type_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
+            dpe_ids = sum(
+                [
+                    [s["dpe_ids"][: len(s["input_ids"]) // 2], s["dpe_ids"][len(s["input_ids"]) // 2 :]]
+                    for s in samples
+                ],
+                [],
+            )
+            if self.apply_mask:
+                input_label = sum(
+                    [
+                        [
+                            s["input_label"][: len(s["input_ids"]) // 2],
+                            s["input_label"][len(s["input_ids"]) // 2 :],
+                        ]
+                        for s in samples
+                    ],
+                    [],
+                )
         else:
             input_ids = [s["input_ids"] for s in samples]
             type_ids = [s["type_ids"] for s in samples]
             dpe_ids = [s["dpe_ids"] for s in samples]
-            times = [s["times"] for s in samples]
             if self.apply_mask:
                 input_label = [s["input_label"] for s in samples]
                 type_label = [s["type_label"] for s in samples]
                 dpe_label = [s["dpe_label"] for s in samples]
 
         sizes = [s.size(0) for s in input_ids]
-        target_size = max(size)
-        
+        target_size = max(sizes)
+
         collated_input_ids = input_ids[0].new_zeros((len(input_ids), target_size)).long()
         collated_type_ids = type_ids[0].new_zeros((len(type_ids), target_size)).long()
         collated_dpe_ids = dpe_ids[0].new_zeros((len(dpe_ids), target_size)).long()
-        collated_times = times[0].new_zeros((len(times), target_size)).long()
         if self.apply_mask:
             collated_input_label = input_label[0].new_zeros((len(input_label), target_size)).long()
             collated_type_label = type_label[0].new_zeros((len(type_label), target_size)).long()
@@ -290,31 +323,65 @@ class FlattenedGenHPFDataset(BaseDataset):
                 collated_input_ids[i] = input_ids[i]
                 collated_type_ids[i] = type_ids[i]
                 collated_dpe_ids[i] = dpe_ids[i]
-                collated_times[i] = times[i]
                 if self.apply_mask:
                     collated_input_label[i] = input_label[i]
                     collated_type_label[i] = type_label[i]
                     collated_dpe_label[i] = dpe_label[i]
             elif diff < 0:
                 collated_input_ids[i] = torch.cat(
-                    [input_ids[i], input_ids[i].new_zeros(-diff,)], dim=0
+                    [
+                        input_ids[i],
+                        input_ids[i].new_zeros(
+                            -diff,
+                        ),
+                    ],
+                    dim=0,
                 )
                 collated_type_ids[i] = torch.cat(
-                    [type_ids[i], type_ids[i].new_zeros(-diff,)], dim=0
+                    [
+                        type_ids[i],
+                        type_ids[i].new_zeros(
+                            -diff,
+                        ),
+                    ],
+                    dim=0,
                 )
                 collated_dpe_ids[i] = torch.cat(
-                    [dpe_ids[i], dpe_ids[i].new_zeros(-diff,)], dim=0
+                    [
+                        dpe_ids[i],
+                        dpe_ids[i].new_zeros(
+                            -diff,
+                        ),
+                    ],
+                    dim=0,
                 )
-                collated_times[i] = torch.cat([times[i], times[i].new_zeros(-diff,)], dim=0)
                 if self.apply_mask:
                     collated_input_label[i] = torch.cat(
-                        [input_label[i], input_label[i].new_zeros(-diff,)], dim=0
+                        [
+                            input_label[i],
+                            input_label[i].new_zeros(
+                                -diff,
+                            ),
+                        ],
+                        dim=0,
                     )
                     collated_type_label[i] = torch.cat(
-                        [type_label[i], type_label[i].new_zeros(-diff,)], dim=0
+                        [
+                            type_label[i],
+                            type_label[i].new_zeros(
+                                -diff,
+                            ),
+                        ],
+                        dim=0,
                     )
                     collated_dpe_label[i] = torch.cat(
-                        [dpe_label[i], dpe_label[i].new_zeros(-diff,)], dim=0
+                        [
+                            dpe_label[i],
+                            dpe_label[i].new_zeros(
+                                -diff,
+                            ),
+                        ],
+                        dim=0,
                     )
             else:
                 raise ValueError(f"size mismatch, expected <={target_size}, got {size}")
@@ -324,7 +391,6 @@ class FlattenedGenHPFDataset(BaseDataset):
             "input_ids": collated_input_ids,
             "type_ids": collated_type_ids,
             "dpe_ids": collated_dpe_ids,
-            "times": collated_times,
         }
 
         if self.apply_mask:
@@ -342,8 +408,7 @@ class FlattenedGenHPFDataset(BaseDataset):
 
     def __getitem__(self, index):
         data_index, subject = self.subjects[index]
-        data = self.data[data_index][subject][self.structure]
-        times = np.array(self.data[data_index][subject]["time"])
+        data = self.data[data_index][subject][self.structure][:]
 
         if self.apply_mask:
             data, mlm_labels = self.mask(
@@ -357,15 +422,15 @@ class FlattenedGenHPFDataset(BaseDataset):
 
         ret = {
             "id": self.subjects[index],
-            "input_ids": torch.LongTensor(data[:, 0, :]),
-            "type_ids": torch.LongTensor(data[:, 1, :]),
-            "dpe_ids": torch.LongTensor(data[:, 2, :]),
-            "times": torch.LongTensor(times),
-            "input_label": torch.LongTensor(mlm_labels[:, 0, :]),
-            "type_label": torch.LongTensor(mlm_labels[:, 1, :]),
-            "dpe_label": torch.LongTensor(mlm_labels[:, 2, :]),
+            "input_ids": torch.LongTensor(data[0, :]),
+            "type_ids": torch.LongTensor(data[1, :]),
+            "dpe_ids": torch.LongTensor(data[2, :]),
         }
-        
+        if self.apply_mask:
+            ret["input_label"] = torch.LongTensor(mlm_labels[0, :])
+            ret["type_label"] = torch.LongTensor(mlm_labels[1, :])
+            ret["dpe_label"] = torch.LongTensor(mlm_labels[2, :])
+
         if self.label:
             for i, task in enumerate(self.tasks):
                 ret[task] = self.labels[self.subjects[index]][task]

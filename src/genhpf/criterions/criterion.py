@@ -6,6 +6,7 @@ from torch.nn.modules.loss import _Loss
 from genhpf.configs import BaseConfig
 from genhpf.models.genhpf import GenHPF
 
+
 class BaseCriterion(_Loss):
     def __init__(self, cfg: BaseConfig):
         super().__init__()
@@ -17,12 +18,7 @@ class BaseCriterion(_Loss):
         return cls(cfg)
 
     def compute_loss(
-        self,
-        logits: torch.Tensor,
-        targets: torch.Tensor,
-        sample=None,
-        net_output=None,
-        model=None
+        self, logits: torch.Tensor, targets: torch.Tensor, sample=None, net_output=None, model=None
     ) -> Tuple[torch.Tensor, List[float]]:
         """Compute the loss given the logits and targets from the model."""
         raise NotImplementedError("Criterion must implement the `compute_loss` method")
@@ -41,16 +37,16 @@ class BaseCriterion(_Loss):
 
     def forward(self, model: GenHPF, sample):
         """Compute the loss for the given sample.
-        
+
         Returns a tuple with three elements:
         1. the loss
         2. the sample size, which is used as the denominator for the gradient
         3. logging outputs to display while training
         """
         net_output = model(**sample["net_input"])
-        logits = model.get_logits(net_output)
+        logits = model.get_logits(sample, net_output)
         targets = model.get_targets(sample, net_output)
-        
+
         loss, losses_to_log = self.compute_loss(
             logits, targets, sample=sample, net_output=net_output, model=model
         )
@@ -64,9 +60,7 @@ class BaseCriterion(_Loss):
         else:
             logging_output["loss"] = losses_to_log[0]
         logging_output["sample_size"] = sample_size
-        logging_output = self.get_logging_outputs(
-            logging_output, logits, targets, sample, net_output
-        )
+        logging_output = self.get_logging_outputs(logging_output, logits, targets, sample)
 
         return loss, sample_size, logging_output
 

@@ -1,0 +1,44 @@
+common:
+  log_format: tqdm
+  log_interval: 10
+  all_gather_list_size: 2048000
+  seed: 42
+
+checkpoint:
+  save_dir: checkpoints
+  save_interval: 1
+  keep_last_epochs: 5
+
+dataset:
+  data_format: genhpf
+  data: ???
+  label: false
+  vocab_size: 28996
+  pad_token_id: 0
+  sep_token_id: 102
+  dummy_token_id: 101
+  ignore_index: -100
+
+  num_workers: 6
+  batch_size: 4
+  train_subset: "train"
+  valid_subset: "valid"
+  test_subset: "test"
+
+distributed_training:
+  distributed_world_size: 1
+  find_unused_parameters: False
+
+criterion:
+  _name: cross_entropy
+
+optimization:
+  max_epoch: 200
+  lr: 1e-4
+
+model:
+  _name: genhpf_mlm
+
+  structure: flattened
+  embedding_method: text
+  agg_max_seq_len: 8192

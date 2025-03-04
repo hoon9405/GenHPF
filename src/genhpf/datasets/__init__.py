@@ -1,17 +1,14 @@
 from typing import List
 
-from .genhpf_dataset import (
-    BaseDataset,
-    HierarchicalGenHPFDataset,
-    FlattenedGenHPFDataset,
-)
 from genhpf.configs import Config
 
+from .genhpf_dataset import BaseDataset, FlattenedGenHPFDataset, HierarchicalGenHPFDataset
+
 __all__ = [
-    "BaseDataset"
-    "HierarchicalGenHPFDataset",
+    "BaseDataset" "HierarchicalGenHPFDataset",
     "FlattenedGenHPFDataset",
 ]
+
 
 def load_dataset(
     data_path: str,
@@ -22,7 +19,8 @@ def load_dataset(
     model_cfg = cfg.model
     criterion_cfg = cfg.criterion
 
-    manifest_paths = [f"{data_path}/{subset}.tsv" for subset in subsets]
+    manifest_paths = [f"{data_path}/{subset.strip()}.tsv" for subset in subsets]
+
     if dataset_cfg.data_format == "genhpf":
         if model_cfg.structure == "hierarchical":
             dataset = HierarchicalGenHPFDataset(
@@ -34,7 +32,7 @@ def load_dataset(
                 pad_token_id=dataset_cfg.pad_token_id,
                 sep_token_id=dataset_cfg.sep_token_id,
                 ignore_index=dataset_cfg.ignore_index,
-                apply_mask=dataset_cfg.apply_mask,
+                apply_mask=dataset_cfg.apply_mask or "mlm" in model_cfg._name,
                 mask_token_id=dataset_cfg.mask_token_id,
                 mask_prob=dataset_cfg.mask_prob,
                 mask_unit=dataset_cfg.mask_unit,
@@ -51,7 +49,7 @@ def load_dataset(
                 pad_token_id=dataset_cfg.pad_token_id,
                 sep_token_id=dataset_cfg.sep_token_id,
                 ignore_index=dataset_cfg.ignore_index,
-                apply_mask=dataset_cfg.apply_mask,
+                apply_mask=dataset_cfg.apply_mask or "mlm" in model_cfg._name,
                 mask_token_id=dataset_cfg.mask_token_id,
                 mask_prob=dataset_cfg.mask_prob,
                 mask_unit=dataset_cfg.mask_unit,
