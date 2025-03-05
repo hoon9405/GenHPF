@@ -1,112 +1,73 @@
 # GenHPF : General Healthcare Predictive Framework for Multi-task Multi-source Learning
 
-GenHPF is a general healthcare predictive framework, which requires no medical domain knowledge and minimal preprocessing for multiple prediction tasks. 
+GenHPF is a general healthcare predictive framework, which requires no medical domain knowledge and minimal preprocessing for multiple prediction tasks.
 
-Our framework presents a method for embedding any form of EHR systems for prediction tasks without requiring domain-knowledge-based pre-processing, such as medical code mapping and feature selection.  
-				
+Our framework presents a method for embedding any form of EHR systems for prediction tasks without requiring domain-knowledge-based pre-processing, such as medical code mapping and feature selection.
+
 This repository provides official Pytorch code to implement GenHPF, a general healthcare predictive framework.
 
 # Getting started with GenHPF
-## STEP 1 : Installation
-Requirements
-
-* [PyTorch](http://pytorch.org/) version >= 1.9.1
-* Python version >= 3.8
+## STEP 1: Installation
+```bash
+$ pip install -e ./
+```
 
 ## STEP 2: Prepare training data
-First, download the required EHR datasets from these links: 
-- [MIMIC-III](https://physionet.org/content/mimiciii/1.4/)
-- [MIMIC-IV](https://physionet.org/content/mimiciv/2.0/)
-- [eICU](https://physionet.org/content/eicu-crd/2.0/)
+Download raw datasets and required tools:
+* [MIMIC-III](https://physionet.org/content/mimiciii/1.4/)
+* [MIMIC-IV](https://physionet.org/content/mimiciv/2.0/)
+* [eICU](https://physionet.org/content/eicu-crd/2.0/)
 
-Note that you will need to request access for each dataset as they are publicly available electronic health records.
-
-For preprocessing instructions, please refer to the README in the `preprocess` directory. 
-
-The preprocessing will automatically handle the data preparation once you specify the raw data directory according to the preprocessing instructions.
-
-
-## STEP 3. Training a new model
-Other configurations will set to be default, which were used in the GenHPF paper.
-$data should be set to 'mimic3' or 'eicu' or ‘mimic4’ 
-`$model` should be set to one of [‘SAnD’, ‘Rajkomar’, ‘DescEmb’, ‘GenHPF’]
-
-`$task` can be set to one of [mortality, long_term_mortality, los_3day, los_7day, readmission, final_acuity, imminent_discharge, diagnosis, creatinine, bilirubin, platelets, wbc] or multiple task.
-The default setting is multi-task on all of tasks.
-
-Note that `--input-path ` should be the root directory containing preprocessed data.
-### Example
-### Train a new GenHPF model:
-
-```shell script
-$ CUDA_VISIBLE_DEVICES=1 \
-    python main.py \
-    --input_path /path/to/data \
-    --model_run GenHPF \
-    --train_task scratch \
-    --train_src $data \
-    --pred_task $pred_task \
-    --criterion prediction \
-    --batch_size $batch_size \
-    --world_size $world_size \
+Then, run:
+```bash
+genhpf-preprocess \
+  --data $DATA_DIR \
+  --ehr {"eicu", "mimiciii", "mimiciv"} \
+  --dest $OUTPUT_DIR \
+  --first_icu \
+  --emb_type {"textbase", "codebase"} \
+  --feature {"all_features", "select"} \
+  --mortality \
+  --long_term_mortality \
+  ... # add desired prediction tasks
 ```
-Note: if you want to train with baselines, set model_run as baseline model, one of (Rajikomar, DescEmb, SAnd).
+This will output the processed data (`data.h5` and `label.csv`) into `$DATA_DIR/data/` directory.
+For detailed descriptions for each argument, see [src/genhpf/scripts/preprocess/genhpf/README.md](src/genhpf/scripts/preprocess/genhpf/README.md).
+<!-- Note that pre-processing takes about 6hours in 128 cores of AMD EPYC 7502 32-Core Processor, and requires 180GB of RAM. -->
 
-### Pre-train GenHPF model:
-
-```shell script
-$ CUDA_VISIBLE_DEVICES=1 \
-    python main.py \
-    --input_path /path/to/data \
-    --model_run GenHPF \
-    --model GenHPF_simclr \
-    --train_src $data \
-    --train_task pretrain  \
-    --pretrain_task $pretrain_task \
-    --criterion $criterion \
-    --batch_size $batch_size \
-    --world_size $world_size \
-    --valid_subset "" \
-    
+Finally, you should prepare data manifest based on the preprocessed data:
+```bash
+genhpf-manifest $data_dir $label_dir \
+  --dest=$output_dir \
+  --prefix=$prefix \
+  --valid_percent=$valid_percent
 ```
+This will generate the manifest files (e.g., `$prefix_train.tsv`, `$prefix_valid.tsv`, `$prefix_test.tsv`) to `$output_dir` based on the `$data_dir`, which contains `data.h5`, and `$label_dir`, which contains `label.csv`.
+The ratio among train, valid, and test splits is decided by `$valid_percent`.
+Note that this is useful to handle various concepts of training and test datasets.
+For instance, if you want to use multiple datasets (e.g., mimiciv and eicu) for training and evaluate the model on each of the datasets separately, you can perform it by placing the corresponding manifest files (e.g., mimiciv_train, eicu_train, mimiciv_valid, eicu_valid, mimiciv_test, eicu_test) in the same data directory and specifying the following command-line arguments: `dataset.train_subset="mimiciv_train,eicu_train" dataset.combine_train_subsets=true dataset.valid_subset="mimiciv_valid,eicu_valid" dataset.test_subset="mimiciv_test,eicu_test"`.
 
-Note: if you want to train with pre-trained model, add command line parameters `--load_checkpoint` with directory of pre-trained model checkpoint and set `train_task` as `finetune`.
+## STEP 3: Training a new model
+We prepared example configuration files for various models and experimental setups.
+For detailed configurations, please see [configs.py](src/genhpf/configs/configs.py) and each implemented source code (e.g., [genhpf.py](src/genhpf/models/genhpf.py)).
 
-## Pooled learning 
-```shell script
-$ CUDA_VISIBLE_DEVICES=1 \
-    python main.py \
-    --input_path /path/to/data \
-    --model_run GenHPF \
-    --train_task scratch \
-    --train_src mimiciii_eicu_mimiciv \
-    --pred_task $pred_task \
-    --criterion prediction \
-    --batch_size $batch_size \
-    --world_size $world_size \
+### Examples
+### Train a new GenHPF model from scratch:
+```bash
+$ genhpf-train dataset.data=??? --config-dir ${GENHPF_DIR}/examples/train/genhpf --config-name hierarchical_scr
 ```
+Note that you should fill in `dataset.data=???` with a path to the directory that contains the data manifest files (e.g., `train.h5`, `valid.h5`, etc.).
 
-Note: Please refer main.py argument ('train_src') for pooled learning.
 
-## Transfer learning
-```shell script
-$ CUDA_VISIBLE_DEVICES=1 \
-    python main.py \
-    --input_path /path/to/data \
-    --model GenHPF \
-    –ratio 0 \
-    --train_src mimiciii \
-    --target_data eicu \
-    --train_task finetune  \
-    --pred_task $pred_task \
-    --criterion prediction \
-    --pretrain $scratch \
-    --batch_size $batch_size \
-    --world_size $world_size \
-    --load_checkpoint $saved_ckpt \
+### Pre-train and fine-tune a new GenHPF model:
+For pre-training with SimCLR:
+```bash
+$ genhpf-train dataset.data=??? --config-dir ${GENHPF_DIR}/examples/pretrain/simclr/genhpf --config-name hierarchical_pt
 ```
-
-Note that `--ratio` indicates proportion of target dataset for few-shot learning settings. (if ratio is set to zero, then it is zero shot learning) 
+For fine-tuning:
+```bash
+$ genhpf-train dataset.data=??? model.from_pretrained=${pretrained_checkpoint.pt} --config-dir ${GENHPF_DIR}/examples/train/genhpf --config-name hierarchical_ft
+```
 
 ## Citation
 If you find GenHPF useful for your research and applications, please cite using this BibTeX:
