@@ -14,53 +14,16 @@ Requirements
 * Python version >= 3.8
 
 ## STEP 2: Prepare training data
-First, download the dataset from these links: 
-	[MIMIC-III](https://physionet.org/content/mimiciii/1.4/)
-[MIMIC-IV](https://physionet.org/content/mimiciv/2.0/)
-[eICU](https://physionet.org/content/eicu-crd/2.0/)
-[ccs_multi_dx_tool_2015](https://www.hcup-us.ahrq.gov/toolssoftware/ccs/Multi_Level_CCS_2015.zip)
-[icd10cmtoicd9gem](https://data.nber.org/gem/icd10cmtoicd9gem.csv)
-	
-!
+First, download the required EHR datasets from these links: 
+- [MIMIC-III](https://physionet.org/content/mimiciii/1.4/)
+- [MIMIC-IV](https://physionet.org/content/mimiciv/2.0/)
+- [eICU](https://physionet.org/content/eicu-crd/2.0/)
 
-Note that you will need to get access for each dataset, publicly available electronic health records. 
+Note that you will need to request access for each dataset as they are publicly available electronic health records.
 
-Second, for preparation your data, make directory structure like below:
-```
-dataset_path
-├─ mimic3
-│  ├─ ADMISSIONS.csv
-│  ├─ PATIENTS.csv
-│  ├─ ICUSYAYS.csv
-│  ├─ LABEVENTES.csv
-│  ├─ PRESCRIPTIONS.csv
-│  ├─ PROCEDURES.csv
-│  ├─ INPUTEVENTS_CV.csv
-│  ├─ INPUTEVENTS_MV.csv
-│  ├─ D_ITEMDS.csv
-│  ├─ D_ICD_PROCEDURES.csv
-│  └─ D_LABITEMS.csv
-├─ eicu
-│  ├─ diagnosis.csv
-│  ├─ infusionDrug.csv
-│  ├─ lab.csv
-│  ├─ medication.csv
-│  └─ patient.csv
-├─ mimci4
-│  ├─ admissions.csv
-│  ├─ …
-│  └─ d_labitems.csv
-├─ ccs_multi_dx_tool_2015.csv
-└─ icd10cmtoicd9gem.csv
+For preprocessing instructions, please refer to the README in the `preprocess` directory. 
 
-```
-Then run preprocessing code
-```shell script
-$ bash preprocess/preprocess_run.sh 
-    $destination_directory
-    $data_directory 
-```
-Note that pre-processing takes about 6hours in 128 cores of AMD EPYC 7502 32-Core Processor, and requires 180GB of RAM.
+The preprocessing will automatically handle the data preparation once you specify the raw data directory according to the preprocessing instructions.
 
 
 ## STEP 3. Training a new model
