@@ -6,13 +6,13 @@ import torch
 import torch.nn.functional as F
 
 import genhpf.utils.utils as utils
-from genhpf.configs import BaseConfig
 from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.criterions.criterion import CriterionConfig
 from genhpf.loggings import metrics
 
 
 @dataclass
-class SimCLRCriterionConfig(BaseConfig):
+class SimCLRCriterionConfig(CriterionConfig):
     temp: float = field(default=0.1, metadata={"help": "temperature to divide logits by"})
 
 

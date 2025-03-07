@@ -6,14 +6,14 @@ import torch
 import torch.nn.functional as F
 
 import genhpf.utils.utils as utils
-from genhpf.configs import BaseConfig
 from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.criterions.criterion import CriterionConfig
 from genhpf.loggings import metrics
 from genhpf.loggings.meters import safe_round
 
 
 @dataclass
-class Wav2Vec2CriterionConfig(BaseConfig):
+class Wav2Vec2CriterionConfig(CriterionConfig):
     loss_weights: Optional[List[float]] = field(
         default=None, metadata={"help": "weights for additional loss terms (not first one)"}
     )

@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import genhpf.utils.utils as utils
-from genhpf.configs import BaseConfig
 from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.criterions.criterion import CriterionConfig
 from genhpf.loggings import metrics
 from genhpf.models.genhpf import GenHPF
 
@@ -14,14 +14,8 @@ from . import build_criterion
 
 
 @dataclass
-class MultiTaskCriterionConfig(BaseConfig):
-    task_names: Optional[List[str]] = field(
-        default=None, metadata={"help": "a list of task names for multi-task learning"}
-    )
-    num_labels: Optional[List[int]] = field(
-        default=None, metadata={"help": "a list of number of labels for each task"}
-    )
-    loss_weights: Optional[List[float]] = field(
+class MultiTaskCriterionConfig(CriterionConfig):
+    task_loss_weights: Optional[List[float]] = field(
         default=None,
         metadata={
             "help": "weights for each loss term. if given, has to be a float list of size " "n_criterions"
@@ -41,19 +35,18 @@ class MultiTaskCriterion(BaseCriterion):
     def __init__(self, cfg: MultiTaskCriterionConfig):
         super().__init__(cfg)
 
-        self.task_names = cfg.task_names
         criterions = {}
         for task_name in self.task_names:
             criterion_cfg = getattr(cfg.args, task_name)
             criterions[task_name] = build_criterion(criterion_cfg)
         self.criterions = criterions
 
-        if cfg.loss_weights is None:
-            self.loss_weights = [1.0] * len(criterions)
+        if cfg.task_loss_weights is None:
+            self.task_loss_weights = [1.0] * len(criterions)
         else:
-            self.loss_weights = cfg.loss_weights
+            self.task_loss_weights = cfg.task_loss_weights
 
-    def forward(self, model: GenHPF, sample):
+    def forward(self, model: GenHPF, sample, return_net_output=False):
         net_output = model(**sample["net_input"])
         logits = model.get_logits(sample, net_output)
         targets = model.get_targets(sample, net_output)
@@ -82,7 +75,7 @@ class MultiTaskCriterion(BaseCriterion):
             task_loss, task_losses_to_log = criterion.compute_loss(
                 logits=task_logits, targets=task_targets, sample=sample, net_output=net_output, model=model
             )
-            task_loss *= self.loss_weights[i]
+            task_loss *= self.task_loss_weights[i]
             sample_size = criterion.get_sample_size(sample, task_targets)
 
             logging_outputs[f"<{task_name}>_criterion_cls"] = criterion.__class__
@@ -109,7 +102,10 @@ class MultiTaskCriterion(BaseCriterion):
         # manipulate sample_size to be 1 to avoid double-dividing gradients in optimizer later
         sample_size = 1
 
-        return loss, sample_size, logging_outputs
+        if return_net_output:
+            return loss, sample_size, logging_outputs, net_output
+        else:
+            return loss, sample_size, logging_outputs
 
     @staticmethod
     def reduce_metrics(logging_outputs: List[Dict[str, Any]]) -> None:

@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from torch.nn.modules.loss import _Loss
@@ -7,13 +8,26 @@ from genhpf.configs import BaseConfig
 from genhpf.models.genhpf import GenHPF
 
 
+@dataclass
+class CriterionConfig(BaseConfig):
+    task_names: Optional[List[str]] = field(
+        default=None, metadata={"help": "a list of task names for multi-task learning"}
+    )
+    num_labels: Optional[List[int]] = field(
+        default=None, metadata={"help": "a list of number of labels for each task"}
+    )
+
+
 class BaseCriterion(_Loss):
-    def __init__(self, cfg: BaseConfig):
+    def __init__(self, cfg: CriterionConfig):
         super().__init__()
         self.cfg = cfg
 
+        self.task_names = cfg.task_names
+        self.num_labels = cfg.num_labels
+
     @classmethod
-    def build_criterion(cls, cfg: BaseConfig):
+    def build_criterion(cls, cfg: CriterionConfig):
         """Construct a new criterion instance."""
         return cls(cfg)
 
@@ -35,7 +49,7 @@ class BaseCriterion(_Loss):
         """
         raise NotImplementedError("Criterion must implement the `get_logging_outputs` method")
 
-    def forward(self, model: GenHPF, sample):
+    def forward(self, model: GenHPF, sample, return_net_output=False):
         """Compute the loss for the given sample.
 
         Returns a tuple with three elements:
@@ -62,7 +76,10 @@ class BaseCriterion(_Loss):
         logging_output["sample_size"] = sample_size
         logging_output = self.get_logging_outputs(logging_output, logits, targets, sample)
 
-        return loss, sample_size, logging_output
+        if return_net_output:
+            return loss, sample_size, logging_output, net_output
+        else:
+            return loss, sample_size, logging_output
 
     @staticmethod
     def reduce_metrics(stats: Dict[str, Any], prefix: str = None) -> None:

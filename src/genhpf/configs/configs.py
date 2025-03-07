@@ -57,6 +57,7 @@ class BaseConfig:
 
 @dataclass
 class CommonConfig(BaseConfig):
+    debug: bool = field(default=False, metadata={"help": "enable debug mode"})
     no_progress_bar: bool = field(default=False, metadata={"help": "disable progress bar"})
     log_interval: int = field(default=100, metadata={"help": "log progress every N batches"})
     log_format: Optional[LOG_FORMAT_CHOICES] = field(default=None, metadata={"help": "log format to use"})
@@ -201,11 +202,39 @@ class CheckpointConfig(BaseConfig):
 
 
 @dataclass
+class MEDSConfig(BaseConfig):
+    output_predictions: bool = field(
+        default=False,
+        metadata={
+            "help": "whether to output predictions. if turned on, `genhpf-test` will automatically "
+            "output predictions of the test set specified by `dataset.test_subset` in the "
+            "`meds.output_dir` directory."
+        },
+    )
+    labels_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "a path to the label directory for MEDS dataset. this is required to store "
+            "output predictions in the format expected by `meds-evaluation` when "
+            "`meds.output_predictions` is turned on."
+        },
+    )
+    output_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "a path to the output directory to store output predictions. "
+            "this is only used when `meds.output_predictions` is turned on."
+        },
+    )
+
+
+@dataclass
 class Config(BaseConfig):
     common: CommonConfig = field(default_factory=CommonConfig)
     distributed_training: DistributedTrainingConfig = field(default_factory=DistributedTrainingConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
     checkpoint: CheckpointConfig = field(default_factory=CheckpointConfig)
+    meds: MEDSConfig = field(default_factory=MEDSConfig)
     model: Any = MISSING
     criterion: Any = None

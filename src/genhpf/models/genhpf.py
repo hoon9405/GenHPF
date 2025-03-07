@@ -27,7 +27,7 @@ class GenHPFConfig(BaseConfig):
     )
 
     encoder_max_seq_len: int = field(
-        default=192,
+        default=128,
         metadata={
             "help": "max sequence length for the event encoder, only used when structure is "
             "hierarchical. this is the max number of tokens in an event."

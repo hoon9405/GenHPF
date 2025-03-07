@@ -7,14 +7,14 @@ import torch
 import torch.nn.functional as F
 
 import genhpf.utils.utils as utils
-from genhpf.configs import BaseConfig
 from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.criterions.criterion import CriterionConfig
 from genhpf.loggings import meters, metrics
 from genhpf.loggings.meters import safe_round
 
 
 @dataclass
-class BinaryCrossEntropyConfig(BaseConfig):
+class BinaryCrossEntropyConfig(CriterionConfig):
     threshold: float = field(default=0.5, metadata={"help": "threshold value for binary classification"})
 
 
@@ -22,6 +22,12 @@ class BinaryCrossEntropyConfig(BaseConfig):
 class BinaryCrossEntropy(BaseCriterion):
     def __init__(self, cfg: BinaryCrossEntropyConfig):
         super().__init__(cfg)
+
+        if self.task_names is not None and len(self.task_names) > 1:
+            raise ValueError(
+                "binary_cross_entropy only supports single task training. if you want "
+                " to train multiple tasks, use multi_task_criterion instead."
+            )
 
         self.threshold = cfg.threshold
 

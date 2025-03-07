@@ -24,6 +24,7 @@ class GenHPFPredictor(GenHPF):
         super().__init__(cfg)
 
         self.num_labels = cfg.num_labels
+        self.tasks = cfg.tasks
         assert len(self.num_labels) == len(
             cfg.tasks
         ), "The number of num_labels must be equal to the number of tasks"
@@ -33,10 +34,16 @@ class GenHPFPredictor(GenHPF):
             self.final_proj[task] = nn.Linear(cfg.agg_embed_dim, self.num_labels[i])
 
     def get_logits(self, sample, net_output):
-        return net_output
+        if len(self.tasks) == 1:
+            return net_output[self.tasks[0]]
+        else:
+            return net_output
 
     def get_targets(self, sample, net_output):
-        return sample["label"]
+        if len(self.tasks) == 1:
+            return sample["label"][self.tasks[0]]
+        else:
+            return sample["label"]
 
     def forward(
         self,

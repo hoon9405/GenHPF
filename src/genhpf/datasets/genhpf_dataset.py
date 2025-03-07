@@ -203,7 +203,7 @@ class HierarchicalGenHPFDataset(GenHPFDataset):
             )
 
         ret = {
-            "id": self.subjects[index],
+            "id": subject,
             "input_ids": torch.LongTensor(data[:, 0, :]),
             "type_ids": torch.LongTensor(data[:, 1, :]),
             "dpe_ids": torch.LongTensor(data[:, 2, :]),

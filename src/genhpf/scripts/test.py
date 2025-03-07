@@ -4,6 +4,7 @@ import pprint
 import sys
 from itertools import chain
 
+import polars as pl
 import torch.distributed
 import torch.utils.data
 
@@ -86,12 +87,61 @@ def main(cfg: Config) -> None:
 
     assert cfg.dataset.test_subset is not None, "Please specify the test subset with `dataset.test_subset`"
     test_subsets = cfg.dataset.test_subset.split(",")
+
     if cfg.dataset.combine_test_subsets:
         datasets = [("combined-test", load_dataset(cfg.dataset.data, test_subsets, cfg))]
     else:
         datasets = [
             (subset.strip(), load_dataset(cfg.dataset.data, [subset], cfg)) for subset in test_subsets
         ]
+
+    output_meds_predictions = False
+    if cfg.dataset.data_format == "meds" and cfg.meds.output_predictions:
+        if len(test_subsets) > 1:
+            raise NotImplementedError(
+                "MEDS dataset does not currently support multiple test subsets when `output_predictions` "
+                "is enabled. Please specify only one test subset."
+            )
+        if cfg.dataset.combine_test_subsets:
+            raise NotImplementedError(
+                "MEDS dataset does not currently support `combine_test_subsets` when `output_predictions` "
+                "is enabled. Please set `dataset.combine_test_subsets` to False."
+            )
+        if len(cfg.criterion.task_names) > 1:
+            raise NotImplementedError(
+                "MEDS dataset does not currently support multiple tasks when `output_predictions` "
+                "is enabled. Please specify only one task."
+            )
+        if cfg.criterion.num_labels[0] > 1:
+            raise NotImplementedError(
+                "MEDS dataset currently only supports binary classification when `output_predictions` "
+                "is enabled. Please specify only one label by setting `criterion.num_labels` to 1."
+            )
+
+        assert (
+            cfg.meds.labels_dir is not None and cfg.meds.output_dir is not None
+        ), "Please specify labels_dir and output_dir in the MEDS config to output predictions."
+        assert data_parallel_world_size == 1, (
+            "MEDS dataset does not currently support distributed testing when `output_predictions` "
+            "is enabled. Please set `distributed_training.distributed_world_size` to 1."
+        )
+
+        output_meds_predictions = True
+
+        labels = pl.read_parquet(os.path.join(cfg.meds.labels_dir, f"{test_subsets[0]}/*.parquet"))
+        labels = labels.sort(by=["subject_id", "prediction_time"])
+        labels = labels.with_columns(pl.col("subject_id").cum_count().over("subject_id").alias("suffix"))
+        labels = labels.with_columns(
+            pl.col("subject_id").cast(str) + "_" + pl.col("suffix").cast(str).alias("subject_id")
+        )
+        labels = labels.drop("suffix")
+        labels = labels.select(["subject_id", "prediction_time", "boolean_value"])
+
+        meds_pred_output = {
+            "subject_id": [],
+            "predicted_boolean_value": [],
+            "predicted_boolean_probability": [],
+        }
 
     for subset, dataset in datasets:
         logger.info(f"begin validation on '{subset}' subset")
@@ -132,8 +182,35 @@ def main(cfg: Config) -> None:
             with torch.no_grad():
                 sample = utils.prepare_sample(sample)
                 sample = _fp_convert_sample(sample)
-                _loss, _sample_size, log_output = criterion(model, sample)
+                _loss, _sample_size, log_output, net_output = criterion(model, sample, return_net_output=True)
                 log_outputs.append(log_output)
+                if output_meds_predictions:
+                    meds_pred_output["subject_id"].extend(sample["id"])
+                    logits = model.get_logits(sample, net_output)
+                    probs = torch.sigmoid(logits).view(-1).cpu()
+                    meds_pred_output["predicted_boolean_probability"].extend(probs.tolist())
+                    meds_pred_output["predicted_boolean_value"].extend(
+                        (probs >= cfg.criterion.threshold).int().tolist()
+                    )
+
+        if output_meds_predictions:
+            meds_pred_output = pl.DataFrame(meds_pred_output)
+            meds_pred_output = meds_pred_output.join(labels, on="subject_id", how="left")
+            meds_pred_output = meds_pred_output.select(
+                [
+                    pl.col("subject_id"),
+                    pl.col("prediction_time"),
+                    pl.col("boolean_value"),
+                    pl.col("predicted_boolean_value"),
+                    pl.col("predicted_boolean_probability"),
+                ]
+            )
+            meds_pred_output = meds_pred_output.with_columns(
+                pl.col("subject_id").map_elements(lambda x: x.split("_")[0], return_dtype=pl.String).cast(int)
+            )
+            if not os.path.exists(cfg.meds.output_dir):
+                os.makedirs(cfg.meds.output_dir)
+            meds_pred_output.write_parquet(os.path.join(cfg.meds.output_dir, f"{subset}.parquet"))
 
         if data_parallel_world_size > 1:
             log_outputs = distributed_utils.all_gather_list(

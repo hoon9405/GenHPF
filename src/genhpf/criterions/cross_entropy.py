@@ -8,14 +8,14 @@ import torch.nn.functional as F
 from omegaconf import II
 
 import genhpf.utils.utils as utils
-from genhpf.configs import BaseConfig
 from genhpf.criterions import BaseCriterion, register_criterion
+from genhpf.criterions.criterion import CriterionConfig
 from genhpf.loggings import meters, metrics
 from genhpf.loggings.meters import safe_round
 
 
 @dataclass
-class CrossEntropyConfig(BaseConfig):
+class CrossEntropyConfig(CriterionConfig):
     report_auc: bool = field(
         default=False,
         metadata={
@@ -30,6 +30,13 @@ class CrossEntropyConfig(BaseConfig):
 class CrossEntropy(BaseCriterion):
     def __init__(self, cfg: CrossEntropyConfig):
         super().__init__(cfg)
+
+        if self.task_names is not None and len(self.task_names) > 1:
+            raise ValueError(
+                "cross_entropy only supports single task training. if you want to train multiple"
+                " tasks, use multi_task_criterion instead."
+            )
+
         self.report_auc = cfg.report_auc
         self.ignore_index = cfg.ignore_index
 
