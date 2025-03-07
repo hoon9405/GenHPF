@@ -35,7 +35,7 @@ dependencies = [
 
 [project.scripts]
 genhpf-preprocess = "genhpf.scripts.preprocess.genhpf.main:main"
-genhpf-preprocess-meds = "genhpf.scripts.preprocess.preproces_meds:main"
+genhpf-preprocess-meds = "genhpf.scripts.preprocess.preprocess_meds:main"
 genhpf-manifest = "genhpf.scripts.manifest:main"
 genhpf-train = "genhpf.scripts.train:cli_main"
 genhpf-test = "genhpf.scripts.test:cli_main"
