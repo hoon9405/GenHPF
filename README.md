@@ -62,7 +62,7 @@ genhpf-preprocess-meds $MEDS_DATA_DIR \
 * `$MEDS_DATA_DIR`: a path to the data directory containing MEDS data to be processed. It can be a directory or the exact file path with the file extension (only `.csv` or `.parquet` allowed). If provided with directory, it tries to scan all `*.csv` or `*.parquet` files contained in the directory recursively. See [this](https://github.com/mmcdermott/MEDS-DEV?tab=readme-ov-file#building-a-dataset) if you want to build a new MEDS dataset based on MIMIC-III, MIMIC-IV, and eICU.
 * `$MEDS_LABELS_DIR`: a path to the label directory for a given task, which must be a result of [ACES](https://github.com/justin13601/ACES) or [MEDS-DEV](https://github.com/mmcdermott/MEDS-DEV). It can be a directory or the exact file path that has the same file extension with the MEDS dataset to be processed. The file structure of this cohort directory should be the same with the provided MEDS data directory (`$MEDS_DATA_DIR`) to match each cohort to its corresponding shard data. See [this](https://github.com/mmcdermott/MEDS-DEV?tab=readme-ov-file#extracting-a-task) to extract a cohort for a specific task defined in MEDS-DEV.
 * `$MEDS_METADATA_DIR`: a path to the metadata directory for the input MEDS dataset, expected to contain `codes.parquet`. This is used to retrieve descriptions for codes in MEDS events and convert each code to the retrieved description. Note that if a code has no specific description in `codes.parquet`, it will just treat that code as a plain text and process the event as it is.
-* `MEDS_OUTPUT_DIR`: directory to save processed outputs.
+* `$MEDS_OUTPUT_DIR`: directory to save processed outputs.
   * Enabling `--rebase` will renew this directory.
 * `$NUM_WORKERS`: number of parallel workers to multi-process the script.
 * **NOTE: if you encounter this error: _"polars' maximum length reached. consider installing 'polars-u64-idx'"_, please consider using more workers or installing polars-u64-idx by `pip install polars-u64-idx`.**
@@ -134,7 +134,7 @@ genhpf-train \
   --config-dir ${GENHPF_DIR}/examples/train/genhpf \
   --config-name meds_hierarchical_scr
 ```
-Note that you should fill in `dataset.data=???` with a path to the directory that contains the data manifest files (e.g., `train.tsv`, `tuning.tsv`, etc.) for the processed MEDS data (i.e., `MEDS_OUTPUT_DIR`).
+Note that you should fill in `dataset.data=???` with a path to the directory that contains the data manifest files (e.g., `train.tsv`, `tuning.tsv`, etc.) for the processed MEDS data (i.e., `$MEDS_OUTPUT_DIR`).
 
 For doing inference on MEDS dataset while outputting prediction results to evaluate the model using [meds-evaluation](https://github.com/kamilest/meds-evaluation):
 ```bash
