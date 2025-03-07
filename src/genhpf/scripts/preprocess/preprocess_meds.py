@@ -101,7 +101,10 @@ def get_parser():
     return parser
 
 
-def main(args):
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+
     root_path = Path(args.root)
     output_dir = Path(args.output_dir)
     metadata_dir = Path(args.metadata_dir)
@@ -579,6 +582,4 @@ def meds_to_remed(
 
 
 if __name__ == "__main__":
-    parser = get_parser()
-    args = parser.parse_args()
-    main(args)
+    main()

@@ -151,7 +151,10 @@ def get_parser():
     return parser
 
 
-def main(args):
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+
     if not os.path.exists(args.dest):
         os.makedirs(args.dest)
 
@@ -169,6 +172,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = get_parser()
-    args = parser.parse_args()
-    main(args)
+    main()
