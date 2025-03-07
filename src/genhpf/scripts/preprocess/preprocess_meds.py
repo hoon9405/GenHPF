@@ -72,6 +72,12 @@ def get_parser():
         help="directory to save processed outputs.",
     )
     parser.add_argument(
+        "--skip-if-exists",
+        action="store_true",
+        help="whether or not to skip the processing if the output directory already "
+        "exists.",
+    )
+    parser.add_argument(
         "--rebase",
         action="store_true",
         help="whether or not to rebase the output directory if exists.",
@@ -110,17 +116,7 @@ def main():
     metadata_dir = Path(args.metadata_dir)
     mimic_dir = Path(args.mimic_dir) if args.mimic_dir is not None else None
 
-    if not output_dir.exists():
-        output_dir.mkdir()
-    else:
-        if args.rebase:
-            shutil.rmtree(output_dir)
-        if output_dir.exists():
-            raise ValueError(
-                f"File exists: '{str(output_dir.resolve())}'. If you want to rebase the "
-                "directory, please run the script with --rebase."
-            )
-        output_dir.mkdir()
+    num_workers = max(args.workers, 1)
 
     if root_path.is_dir():
         data_paths = glob.glob(str(root_path / "**/*.csv"), recursive=True)
@@ -130,6 +126,34 @@ def main():
             raise ValueError("Data directory does not contain any supported file formats: .csv or .parquet")
     else:
         data_paths = [root_path]
+
+    if not output_dir.exists():
+        output_dir.mkdir()
+    else:
+        if args.rebase:
+            shutil.rmtree(output_dir)
+        if output_dir.exists():
+            if args.skip_if_exists:
+                ls = glob.glob(str(output_dir / "**/*"), recursive=True)
+                expected_files = []
+                for subset in set(os.path.dirname(x) for x in data_paths):
+                    expected_files.extend([
+                        os.path.join(str(output_dir), os.path.basename(subset), f"{i}.h5")
+                        for i in range(num_workers)
+                    ])
+                if set(expected_files).issubset(set(ls)):
+                    print(
+                        f"Output directory already contains the expected files. Skipping the "
+                        "processing as --skip-if-exists is set. If you want to rebase the directory, "
+                        "please run the script with --rebase."
+                    )
+                    return
+            else:
+                raise ValueError(
+                    f"File exists: '{str(output_dir.resolve())}'. If you want to rebase the "
+                    "directory, please run the script with --rebase."
+                )
+        output_dir.mkdir()
 
     label_col_name = args.cohort_label_name
 
@@ -298,7 +322,7 @@ def main():
                 codes_metadata,
                 output_dir,
                 output_name,
-                args.workers,
+                num_workers,
                 d_items,
                 d_labitems,
                 warned_codes,
@@ -307,25 +331,25 @@ def main():
 
             # meds --> remed
             print("Processing...")
-            if args.workers <= 1:
+            if num_workers <= 1:
                 length_per_subject_gathered = [meds_to_remed_partial(data)]
                 del data
             else:
                 subject_ids = data["subject_id"].unique().to_list()
-                n = args.workers
+                n = num_workers
                 subject_id_chunks = [subject_ids[i::n] for i in range(n)]
                 data_chunks = []
                 for subject_id_chunk in subject_id_chunks:
                     data_chunks.append(data.filter(pl.col("subject_id").is_in(subject_id_chunk)))
                 del data
-                pool = multiprocessing.get_context("spawn").Pool(processes=args.workers)
+                pool = multiprocessing.get_context("spawn").Pool(processes=num_workers)
                 # the order is preserved
                 length_per_subject_gathered = pool.map(meds_to_remed_partial, data_chunks)
                 pool.close()
                 pool.join()
                 del data_chunks
 
-            if len(length_per_subject_gathered) != args.workers:
+            if len(length_per_subject_gathered) != num_workers:
                 print(
                     "Number of processed workers were smaller than the specified num workers "
                     "(--workers) due to the small size of data. Consider reducing the number of "
