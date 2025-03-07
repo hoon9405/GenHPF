@@ -8,8 +8,14 @@ This repository provides official Pytorch code to implement GenHPF, a general he
 
 # Getting started with GenHPF
 ## STEP 1: Installation
+For developing locally:
 ```bash
 $ pip install -e ./
+```
+
+Otherwise:
+```bash
+$ pip install genhpf
 ```
 
 ## STEP 2: Prepare training data
