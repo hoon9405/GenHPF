@@ -1,0 +1,105 @@
+common:
+  log_format: tqdm
+  log_interval: 10
+  all_gather_list_size: 2048000
+  seed: 42
+
+checkpoint:
+  save_dir: checkpoints
+  best_checkpoint_metric: avg_auroc
+  maximize_best_checkpoint_metric: true
+  save_interval: 1
+  keep_last_epochs: 5
+  patience: 10
+
+dataset:
+  data_format: genhpf
+  data: ???
+  label: true
+  vocab_size: 28996
+  pad_token_id: 0
+  sep_token_id: 102
+  dummy_token_id: 101
+  ignore_index: -100
+
+  num_workers: 6
+  batch_size: 16
+  train_subset: "train"
+  valid_subset: "valid"
+  test_subset: "test"
+
+distributed_training:
+  distributed_world_size: 1
+  find_unused_parameters: False
+
+criterion:
+  _name: multi_task_criterion
+  task_names:
+    - mortality
+    - long_term_mortality
+    - los_3day
+    - los_7day
+    - readmission
+    - final_acuity
+    - imminent_discharge
+    - diagnosis
+    - bilirubin
+    - platelets
+    - creatinine
+    - wbc
+  num_labels:
+    - 1
+    - 1
+    - 1
+    - 1
+    - 1
+    - 6
+    - 6
+    - 17
+    - 5
+    - 5
+    - 5
+    - 3
+  args:
+    mortality:
+      _name: binary_cross_entropy
+    long_term_mortality:
+      _name: binary_cross_entropy
+    los_3day:
+      _name: binary_cross_entropy
+    los_7day:
+      _name: binary_cross_entropy
+    readmission:
+      _name: binary_cross_entropy
+    final_acuity:
+      _name: cross_entropy
+      report_auc: true
+    imminent_discharge:
+      _name: cross_entropy
+      report_auc: true
+    diagnosis:
+      _name: binary_cross_entropy_with_logits
+    bilirubin:
+      _name: cross_entropy
+      report_auc: true
+    platelets:
+      _name: cross_entropy
+      report_auc: true
+    creatinine:
+      _name: cross_entropy
+      report_auc: true
+    wbc:
+      _name: cross_entropy
+      report_auc: true
+
+optimization:
+  max_epoch: 100
+  lr: 1e-4
+
+model:
+  _name: genhpf_predictor
+
+  structure: hierarchical
+  embedding_method: text
+
+  from_pretrained: ???
