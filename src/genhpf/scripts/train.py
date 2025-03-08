@@ -281,6 +281,14 @@ def validate(
 
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
 
+        if np.isnan(stats[cfg.checkpoint.best_checkpoint_metric]):
+            logger.info(
+                f"validation value for {cfg.checkpoint.best_checkpoint_metric} is NaN. "
+                "Changed the best checkpoint metric to loss."
+            )
+            cfg.checkpoint.best_checkpoint_metric = "loss"
+            cfg.checkpoint.maximize_best_checkpoint_metric = False
+
         valid_losses.append(stats[cfg.checkpoint.best_checkpoint_metric])
 
     return valid_losses
