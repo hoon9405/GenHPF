@@ -29,6 +29,7 @@ dependencies = [
     "scikit-learn==1.6.1",
     "pandas==2.2.3",
     "polars==1.17.1",
+    "pyarrow==17.0.0",
 ]
 
 [tool.setuptools_scm]
