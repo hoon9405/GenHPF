@@ -148,11 +148,11 @@ def main():
         data_paths = [root_path]
 
     if not output_dir.exists():
-        output_dir.mkdir()
+        output_dir.mkdir(parents=True)
     else:
         if args.rebase:
             shutil.rmtree(output_dir)
-            output_dir.mkdir()
+            output_dir.mkdir(parents=True)
         elif output_dir.exists():
             if args.skip_if_exists:
                 ls = glob.glob(str(output_dir / "**/*"), recursive=True)
