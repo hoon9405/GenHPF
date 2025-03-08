@@ -208,6 +208,9 @@ def main(cfg: Config) -> None:
             meds_pred_output = meds_pred_output.with_columns(
                 pl.col("subject_id").map_elements(lambda x: x.split("_")[0], return_dtype=pl.String).cast(int)
             )
+            meds_pred_output = (
+                meds_pred_output.with_columns(pl.col("predicted_boolean_value").cast(bool))
+            )
             if not os.path.exists(cfg.meds.output_dir):
                 os.makedirs(cfg.meds.output_dir)
             meds_pred_output.write_parquet(os.path.join(cfg.meds.output_dir, f"{subset}.parquet"))
