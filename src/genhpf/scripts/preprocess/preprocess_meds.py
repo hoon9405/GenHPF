@@ -1,10 +1,10 @@
 import functools
+import logging
 import glob
 import multiprocessing
 import os
 import re
 import shutil
-import warnings
 from argparse import ArgumentParser
 from bisect import bisect_left, bisect_right
 from datetime import datetime
@@ -16,6 +16,9 @@ import pandas as pd
 import polars as pl
 from tqdm import tqdm
 from transformers import AutoTokenizer
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 pool_manager = multiprocessing.Manager()
 warned_codes = pool_manager.list()
@@ -83,6 +86,13 @@ def get_parser():
         help="whether or not to rebase the output directory if exists.",
     )
     parser.add_argument(
+        "--debug",
+        type=bool,
+        default=False,
+        help="whether or not to enable the debug mode, which forces the script to be run with "
+        "only one worker."
+    )
+    parser.add_argument(
         "--workers",
         metavar="N",
         default=1,
@@ -117,6 +127,16 @@ def main():
     mimic_dir = Path(args.mimic_dir) if args.mimic_dir is not None else None
 
     num_workers = max(args.workers, 1)
+    if args.debug:
+        num_workers = 1
+    else:
+        cpu_count = multiprocessing.cpu_count()
+        if num_workers > cpu_count:
+            logger.warning(
+                f"Number of workers (--workers) is greater than the number of available CPUs "
+                f"({cpu_count}). Setting the number of workers to {cpu_count}."
+            )
+            num_workers = cpu_count
 
     if root_path.is_dir():
         data_paths = glob.glob(str(root_path / "**/*.csv"), recursive=True)
@@ -132,7 +152,8 @@ def main():
     else:
         if args.rebase:
             shutil.rmtree(output_dir)
-        if output_dir.exists():
+            output_dir.mkdir()
+        elif output_dir.exists():
             if args.skip_if_exists:
                 ls = glob.glob(str(output_dir / "**/*"), recursive=True)
                 expected_files = []
@@ -142,7 +163,7 @@ def main():
                         for i in range(num_workers)
                     ])
                 if set(expected_files).issubset(set(ls)):
-                    print(
+                    logger.info(
                         f"Output directory already contains the expected files. Skipping the "
                         "processing as --skip-if-exists is set. If you want to rebase the directory, "
                         "please run the script with --rebase."
@@ -151,9 +172,8 @@ def main():
             else:
                 raise ValueError(
                     f"File exists: '{str(output_dir.resolve())}'. If you want to rebase the "
-                    "directory, please run the script with --rebase."
+                    "directory automatically, please run the script with --rebase."
                 )
-        output_dir.mkdir()
 
     label_col_name = args.cohort_label_name
 
@@ -330,7 +350,7 @@ def main():
             )
 
             # meds --> remed
-            print("Processing...")
+            logger.info(f"Start processing {data_path}")
             if num_workers <= 1:
                 length_per_subject_gathered = [meds_to_remed_partial(data)]
                 del data
@@ -342,6 +362,15 @@ def main():
                 for subject_id_chunk in subject_id_chunks:
                     data_chunks.append(data.filter(pl.col("subject_id").is_in(subject_id_chunk)))
                 del data
+
+                num_valid_data_chunks = sum(map(lambda x: len(x) > 0, data_chunks))
+                if num_valid_data_chunks < num_workers:
+                    raise ValueError(
+                        "Number of valid data chunks (= number of unique subjects) were smaller "
+                        "than the specified num workers (--workers) due to the small size of data. "
+                        "Consider reducing the number of workers."
+                    )
+
                 pool = multiprocessing.get_context("spawn").Pool(processes=num_workers)
                 # the order is preserved
                 length_per_subject_gathered = pool.map(meds_to_remed_partial, data_chunks)
@@ -350,7 +379,7 @@ def main():
                 del data_chunks
 
             if len(length_per_subject_gathered) != num_workers:
-                print(
+                raise ValueError(
                     "Number of processed workers were smaller than the specified num workers "
                     "(--workers) due to the small size of data. Consider reducing the number of "
                     "workers."
@@ -420,7 +449,7 @@ def meds_to_remed(
 
                             if do_break and col_event not in warned_codes:
                                 warned_codes.append(col_event)
-                                warnings.warn(
+                                logger.warning(
                                     "The dataset contains some codes that are not specified in "
                                     "the codes metadata, which may not be intended. Note that we "
                                     f"process this code as it is for now: {col_event}."
