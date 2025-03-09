@@ -73,12 +73,23 @@ class GenHPFConfig(BaseConfig):
     )
 
     vocab_size: int = II("dataset.vocab_size")
+    debug: bool = II("common.debug")
 
 
 class GenHPF(nn.Module):
     def __init__(self, cfg: GenHPFConfig):
         super().__init__()
         self.cfg = cfg
+
+        if cfg.debug:
+            cfg.encoder_layers = 1
+            cfg.encoder_embed_dim = 32
+            cfg.encoder_ffn_embed_dim = 128
+            cfg.encoder_attention_heads = 2
+            cfg.agg_layers = 1
+            cfg.agg_embed_dim = 32
+            cfg.agg_ffn_embed_dim = 128
+            cfg.agg_attention_heads = 2
 
         self.structure = cfg.structure
         assert self.structure in GENHPF_MODEL_ARCH_CHOICES
