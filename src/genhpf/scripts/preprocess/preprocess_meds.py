@@ -210,9 +210,16 @@ def main():
         data_path = Path(data_path)
         subdir = data_path.relative_to(root_path).parent
         if data_path.suffix == ".csv":
-            data = pl.scan_csv(data_path)
+            data = pl.scan_csv(
+                data_path,
+                low_memory=True if args.debug else False,
+            )
         elif data_path.suffix == ".parquet":
-            data = pl.scan_parquet(data_path)
+            data = pl.scan_parquet(
+                data_path,
+                parallel="none" if args.debug else "auto",
+                low_memory=True if args.debug else False,
+            )
         else:
             raise ValueError(f"Unsupported file format: {data_path.suffix}")
 
@@ -312,6 +319,9 @@ def main():
             pl.col("time").list.sample(n=pl.col("code").list.len(), with_replacement=True)
         )
 
+        if args.debug:
+            data = data[:5000]
+
         if str(subdir) != ".":
             output_name = str(subdir)
         else:
@@ -348,6 +358,7 @@ def main():
                 d_labitems,
                 warned_codes,
                 max_event_length,
+                args.debug,
             )
 
             # meds --> remed
@@ -403,6 +414,7 @@ def meds_to_remed(
     d_labitems,
     warned_codes,
     max_event_length,
+    debug,
     df_chunk,
 ):
     code_matching_pattern = re.compile(r"\d+")
@@ -591,6 +603,14 @@ def meds_to_remed(
         maintain_order=True,
     ).agg(pl.all())
 
+    if debug:
+        df_chunk = df_chunk.with_columns(
+            [
+            pl.col("time").map_elements(lambda x: x[-100:], return_dtype=pl.List(pl.List(str))),
+            pl.col("data_index").map_elements(lambda x: x[-100:], return_dtype=pl.List(pl.List(int)))
+            ]
+        )
+
     df_chunk = df_chunk.sort(by=["subject_id", "cohort_end"])
     # regard {subject_id} as {cohort_id}: {subject_id}_{cohort_number}
     df_chunk = df_chunk.with_columns(pl.col("subject_id").cum_count().over("subject_id").alias("suffix"))
@@ -616,11 +636,15 @@ def meds_to_remed(
 
             sample_result = result.create_group(sample[0])
 
+            times = np.concatenate(sample[2])
             data_indices = np.concatenate(sample[3])
+            if debug:
+                data_indices = data_indices[-100:]
+                times = times[-100:]
+
             data = events_data[data_indices]
             sample_result.create_dataset("hi", data=data, dtype="i2", compression="lzf", shuffle=True)
 
-            times = np.concatenate(sample[2])
             times = [datetime.strptime(x, "%Y-%m-%d %H:%M:%S") for x in times]
             times = np.cumsum(np.diff(times))
             times = list(map(lambda x: round(x.total_seconds() / 60), times))

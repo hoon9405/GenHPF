@@ -202,7 +202,7 @@ class Trainer(object):
             dataset,
             batch_size=self.cfg.dataset.batch_size,
             shuffle=True if not dist.is_initialized() else False,
-            num_workers=self.cfg.dataset.num_workers,
+            num_workers=self.cfg.dataset.num_workers if not self.cfg.common.debug else 0,
             collate_fn=dataset.collator,
             sampler=batch_sampler,
         )
@@ -220,7 +220,7 @@ class Trainer(object):
             dataset,
             batch_size=self.cfg.dataset.batch_size,
             shuffle=False,
-            num_workers=self.cfg.dataset.num_workers,
+            num_workers=self.cfg.dataset.num_workers if not self.cfg.common.debug else 0,
             collate_fn=dataset.collator,
             sampler=batch_sampler,
         )
