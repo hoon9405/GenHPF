@@ -36,6 +36,9 @@ def main(cfg: Config) -> None:
         # make hydra logging work with ddp (see # see https://github.com/facebookresearch/hydra/issues/1126)
         logging.config.dictConfig(OmegaConf.to_container(cfg.job_logging_cfg))
 
+    if cfg.common.debug:
+        os.environ["OMP_NUM_THREADS"] = "1"
+
     assert cfg.dataset.batch_size is not None, "batch_size must be specified"
     metrics.reset()
 
