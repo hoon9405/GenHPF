@@ -129,6 +129,7 @@ def main():
     num_workers = max(args.workers, 1)
     if args.debug:
         num_workers = 1
+        os.environ["RAYON_RS_NUM_CPUS"] = "1"
     else:
         cpu_count = multiprocessing.cpu_count()
         if num_workers > cpu_count:
