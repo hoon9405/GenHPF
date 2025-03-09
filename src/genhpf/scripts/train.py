@@ -37,10 +37,10 @@ def main(cfg: Config) -> None:
         logging.config.dictConfig(OmegaConf.to_container(cfg.job_logging_cfg))
 
     if cfg.common.debug:
-        os.environ["OMP_NUM_THREADS"] = "4"
-        os.environ["MKL_NUM_THREADS"] = "4"
-        torch.set_num_threads(4)
-        torch.set_num_interop_threads(4)
+        os.environ["OMP_NUM_THREADS"] = "2"
+        os.environ["MKL_NUM_THREADS"] = "2"
+        torch.set_num_threads(2)
+        torch.set_num_interop_threads(2)
         cfg.optimization.max_epoch = 1
 
     assert cfg.dataset.batch_size is not None, "batch_size must be specified"
