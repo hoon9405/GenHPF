@@ -102,6 +102,10 @@ As a result, you will have `.h5` and `.tsv` files that has a following respectiv
   …   …           …
   ```
 
+> \[!Note\]
+> GenHPF preprocessing requires a tokenizer from HuggingFace (`emilyalsentzer/Bio_ClinicalBERT`), which means internet access is needed during the initial setup to download the tokenizer.
+> If you are working in a network-restricted setting, you can manually download the tokenizer and load it from a local path.
+
 ## STEP 3: Training a new model
 We prepared example configuration files for various models and experimental setups.
 For detailed configurations, please see [configs.py](src/genhpf/configs/configs.py) and each implemented source code (e.g., [genhpf.py](src/genhpf/models/genhpf.py)).
