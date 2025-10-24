@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+title: General Healthcare Predictive Framework (GenHPF)
+message: "if you use this software, please cite it as below."
+type: article
+authors:
+- family-names: "Hur"
+  given-names: "Kyunghoon"
+- family-names: "Oh"
+  given-names: "Jungwoo"
+- family-names: "Kim"
+  given-names: "Junu"
+- family-names: "Kim"
+  given-names: "Jiyoun"
+- family-names: "Lee"
+  given-names: "Min Jae"
+- family-names: "Cho"
+  given-names: "Eunbyeol"
+- family-names: "Moon"
+  given-names: "Seong-Eun"
+- family-names: "Kim"
+  given-names: "Young-Hak"
+- family-names: "Atallah"
+  given-names: "Louis"
+- family-names: "Choi"
+  given-names: "Edward"
+version: 1.0.10
+doi: 10.1109/JBHI.2023.3327951
+journal: IEEE Journal of Biomedical and Health Informatics
+volume: 28
+issue: 1
+start: 502
+end: 513
+year: 2023
+publisher: IEEE
+repository-code: "https://github.com/hoon9405/GenHPF"
+url: "https://github.com/hoon9405/GenHPF"
