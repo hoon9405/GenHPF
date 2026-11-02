@@ -182,7 +182,11 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained("emilyalsentzer/Bio_ClinicalBERT")
 
     codes_metadata = pl.read_parquet(metadata_dir / "codes.parquet").to_pandas()
-    codes_metadata = codes_metadata.set_index("code")["description"].to_dict()
+    # `description` is optional as of MEDS 0.4; codes without one are processed as they are
+    if "description" in codes_metadata.columns:
+        codes_metadata = codes_metadata.set_index("code")["description"].to_dict()
+    else:
+        codes_metadata = {}
     # do not allow to use static events or birth event
     birth_code = args.birth_code
     # if birth_code not in codes_metadata:
@@ -223,6 +227,10 @@ def main():
             )
         else:
             raise ValueError(f"Unsupported file format: {data_path.suffix}")
+
+        # `numeric_value` is optional as of MEDS 0.4
+        if "numeric_value" not in data.collect_schema().names():
+            data = data.with_columns(pl.lit(None, dtype=pl.Float32).alias("numeric_value"))
 
         data = data.with_columns(
             pl.when(pl.col("code") == birth_code).then(None).otherwise(pl.col("time")).alias("time")
@@ -364,6 +372,7 @@ def main():
             # meds --> remed
             logger.info(f"Start processing {data_path}")
             if num_workers <= 1:
+                n_processes = 1
                 length_per_subject_gathered = [meds_to_remed_partial(data)]
                 del data
             else:

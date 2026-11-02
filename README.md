@@ -1,5 +1,11 @@
 # GenHPF : General Healthcare Predictive Framework for Multi-task Multi-source Learning
 
+[![PyPI](https://img.shields.io/pypi/v/genhpf)](https://pypi.org/project/genhpf/)
+[![Python](https://img.shields.io/badge/python-%E2%89%A53.10-blue)](https://www.python.org/downloads/)
+[![MEDS](https://img.shields.io/badge/MEDS-0.4.1-blue)](https://github.com/Medical-Event-Data-Standard/meds/releases/tag/0.4.1)
+[![DOI](https://img.shields.io/badge/DOI-10.1109%2FJBHI.2023.3327951-blue)](https://doi.org/10.1109/JBHI.2023.3327951)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 GenHPF is a general healthcare predictive framework, which requires no medical domain knowledge and minimal preprocessing for multiple prediction tasks.
 
 Our framework presents a method for embedding any form of EHR systems for prediction tasks without requiring domain-knowledge-based pre-processing, such as medical code mapping and feature selection.
